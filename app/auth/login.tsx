@@ -45,84 +45,76 @@ export default function Login() {
         
         logger.log('Resultado de autenticación:', result);
         if (result.type === 'success' && result.url) {
-          const params = new URL(result.url).hash.substring(1).split('&').reduce((acc, curr) => {
-            const [key, value] = curr.split('=');
-            acc[key] = decodeURIComponent(value);
-            return acc;
-          }, {} as Record<string, string>);
-
-          if (params.access_token) {
-            // Verificamos que tengamos tanto el access_token como el refresh_token
-            if (!params.refresh_token) {
-              console.error('Error: refresh_token no encontrado en los parámetros de autenticación');
+          try {
+            const url = new URL(result.url);
+            const authCode = url.searchParams.get('code');
+            
+            if (!authCode) {
+              logger.error('No se encontró código de autorización en la URL');
               Alert.alert('Error de autenticación', 'No se pudo completar el inicio de sesión. Intenta nuevamente.');
               return;
             }
             
-            console.log('Tokens recibidos correctamente, configurando sesión...');
+            logger.log('Código de autorización recibido, intercambiando por tokens...');
             
-            try {
-              const { data, error: sessionError } = await supabase.auth.setSession({
-                access_token: params.access_token,
-                refresh_token: params.refresh_token,
-              });
+            // Intercambiar el código por tokens (esto lo maneja Supabase automáticamente)
+            const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(authCode);
 
-              if (sessionError) {
-                logger.error('Error setting session', sessionError);
-                Alert.alert('Problema de sesión', 'No pudimos iniciar tu sesión. Por favor intenta nuevamente.');
-                return;
-              }
-              
-              // Verificar si tenemos una sesión válida
-              if (!data || !data.session) {
-                logger.error('No se obtuvo una sesión válida');
-                Alert.alert('Sesión no disponible', 'No pudimos verificar tu identidad. Por favor intenta iniciar sesión nuevamente.');
-                return;
-              }
-              
-              const session = data.session;
-              logger.log('Sesión establecida correctamente');
-              
-              // Verificar si el usuario tiene un perfil
-              const { data: profile, error: profileError } = await supabase
-                .from('profiles')
-                .select('*')
-                .eq('id', session.user.id)
-                .single();
-
-              if (profileError && profileError.code === 'PGRST116') {
-                // No se encontró el perfil
-                Alert.alert(
-                  'Cuenta no encontrada',
-                  'No encontramos una cuenta existente. ¿Deseas crear una nueva cuenta?',
-                  [
-                    {
-                      text: 'Cancelar',
-                      style: 'cancel',
-                      onPress: async () => {
-                        // Cerrar la sesión ya que no tiene perfil
-                        await supabase.auth.signOut();
-                      }
-                    },
-                    {
-                      text: 'Crear cuenta',
-                      onPress: () => {
-                        setSession(session); // Guardamos la sesión primero
-                        router.push('/auth/register');
-                      }
-                    }
-                  ]
-                );
-                return;
-              }
-
-              // Si tiene perfil, procedemos normalmente
-              setSession(session);
-              router.replace('/');
-            } catch (err) {
-              logger.error('Error al procesar la sesión', err);
-              Alert.alert('Problema de conexión', 'Hubo un problema al conectar con tu cuenta. Por favor intenta nuevamente.');
+            if (sessionError) {
+              logger.error('Error setting session', sessionError);
+              Alert.alert('Problema de sesión', 'No pudimos iniciar tu sesión. Por favor intenta nuevamente.');
+              return;
             }
+            
+            // Verificar si tenemos una sesión válida
+            if (!data || !data.session) {
+              logger.error('No se obtuvo una sesión válida');
+              Alert.alert('Sesión no disponible', 'No pudimos verificar tu identidad. Por favor intenta iniciar sesión nuevamente.');
+              return;
+            }
+            
+            const session = data.session;
+            logger.log('Sesión establecida correctamente');
+            
+            // Verificar si el usuario tiene un perfil
+            const { data: profile, error: profileError } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single();
+
+            if (profileError && profileError.code === 'PGRST116') {
+              // No se encontró el perfil
+              Alert.alert(
+                'Cuenta no encontrada',
+                'No encontramos una cuenta existente. ¿Deseas crear una nueva cuenta?',
+                [
+                  {
+                    text: 'Cancelar',
+                    style: 'cancel',
+                    onPress: async () => {
+                      // Cerrar la sesión ya que no tiene perfil
+                      await supabase.auth.signOut();
+                    }
+                  },
+                  {
+                    text: 'Crear cuenta',
+                    onPress: () => {
+                      setSession(session); // Guardamos la sesión primero
+                      router.replace('/auth/register'); // Usamos replace en lugar de push para evitar acumular historial
+                    }
+                  }
+                ]
+              );
+              return;
+            }
+
+            // Si tiene perfil, procedemos normalmente
+            setSession(session);
+            router.replace('/');
+          } catch (err) {
+            logger.error('Error al procesar la sesión', err);
+            Alert.alert('Problema de conexión', 'Hubo un problema al conectar con tu cuenta. Por favor intenta nuevamente.');
           }
         } else {
           logger.error('Autenticación no exitosa', { type: result.type });
@@ -194,6 +186,8 @@ export default function Login() {
           return;
         }
         
+        // Simplemente establecemos la sesión y redirigimos sin mostrar alertas adicionales
+        // para evitar la duplicación de mensajes
         setSession(data.session);
         router.replace('/');
       } else {
@@ -294,7 +288,7 @@ export default function Login() {
           
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>¿No tienes una cuenta?</Text>
-            <Link href="/auth/manual-register" asChild>
+            <Link href="/auth/manual-register" replace={true} asChild>
               <TouchableOpacity>
                 <Text style={styles.registerLink}>Crear cuenta</Text>
               </TouchableOpacity>

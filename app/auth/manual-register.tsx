@@ -169,11 +169,8 @@ export default function ManualRegister() {
                         } else {
                           console.log('Perfil creado exitosamente en segundo intento');
                           setSession(session);
-                          Alert.alert(
-                            'Registro exitoso', 
-                            '¡Tu cuenta ha sido creada correctamente!',
-                            [{ text: 'OK', onPress: () => router.replace('/') }]
-                          );
+                          // Redirigir sin mostrar alerta para evitar mensajes duplicados
+                          router.replace('/');
                           return;
                         }
                       }
@@ -185,11 +182,8 @@ export default function ManualRegister() {
                   
                   console.log('Perfil creado exitosamente');
                   setSession(session);
-                  Alert.alert(
-                    'Registro exitoso', 
-                    '¡Tu cuenta ha sido creada correctamente!',
-                    [{ text: 'OK', onPress: () => router.replace('/') }]
-                  );
+                  // Redirigir sin mostrar alerta para evitar mensajes duplicados
+                  router.replace('/');
                 } catch (error) {
                   console.error('Error al crear perfil:', error);
                   Alert.alert('Error', 'No se pudo crear el perfil de usuario');
@@ -303,23 +297,55 @@ export default function ManualRegister() {
       }
 
       // Crear el perfil del usuario en la tabla profiles
-      const { error: profileError } = await supabase
+      const username = formData.email.split('@')[0] + '_' + Math.floor(Math.random() * 10000);
+      
+      // Primer intento de creación de perfil
+      let { error: profileError } = await supabase
         .from('profiles')
         .insert([
           {
             id: authData.user.id,
-            username: formData.email.split('@')[0],
+            username: username,
             first_name: formData.firstName,
             last_name: formData.lastName,
           }
         ]);
 
+      // Si hay un error, podría ser por duplicidad de username
       if (profileError) {
-        console.error('Error al crear perfil:', profileError);
-        Alert.alert('Error', 'Se creó la cuenta pero no se pudo configurar el perfil');
-        return;
+        console.error('Primer intento fallido al crear perfil:', profileError);
+        
+        // Intentamos nuevamente con un username más único
+        const uniqueUsername = `user_${authData.user.id.substring(0, 8)}_${Date.now()}`;
+        
+        // Segundo intento con username más único
+        const { error: secondAttemptError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: authData.user.id,
+              username: uniqueUsername,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+            }
+          ]);
+        
+        if (secondAttemptError) {
+          console.error('Segundo intento fallido al crear perfil:', secondAttemptError);
+          
+          // A pesar del error en la creación del perfil, enfocamos el mensaje en verificar el correo
+          Alert.alert(
+            'Cuenta creada',
+            'Tu cuenta ha sido creada. Por favor, verifica tu correo electrónico para activarla y poder iniciar sesión.',
+            [
+              { text: 'OK', onPress: () => router.replace('/auth/login') }
+            ]
+          );
+          return;
+        }
       }
 
+      // Mostrar solo una alerta para evitar mensajes duplicados
       Alert.alert(
         'Registro exitoso',
         'Tu cuenta ha sido creada. Por favor, verifica tu correo electrónico para activar tu cuenta.',
@@ -453,7 +479,7 @@ export default function ManualRegister() {
 
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>¿Ya tienes una cuenta?</Text>
-              <Link href="/auth/login" asChild>
+              <Link href="/auth/login" replace={true} asChild>
                 <TouchableOpacity>
                   <Text style={styles.loginLink}>Iniciar sesión</Text>
                 </TouchableOpacity>

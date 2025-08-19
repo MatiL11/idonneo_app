@@ -115,11 +115,8 @@ export default function Register() {
           
           if (existingProfile) {
             console.log('El perfil ya existe para este ID, redirigiendo...');
-            Alert.alert(
-              'Cuenta existente',
-              'Ya tienes una cuenta con nosotros. Te redirigiremos a la app.',
-              [{ text: 'Continuar', onPress: () => router.replace('/') }]
-            );
+            // Redirigimos directamente sin mostrar alerta para evitar duplicación
+            router.replace('/');
             return;
           } else {
             // Si no existe un perfil con este ID pero hay conflicto de username, intentamos con otro username
@@ -148,11 +145,8 @@ export default function Register() {
               return;
             } else {
               console.log('Perfil creado exitosamente en segundo intento');
-              Alert.alert(
-                'Registro exitoso', 
-                '¡Tu cuenta ha sido creada correctamente!',
-                [{ text: 'OK', onPress: () => router.replace('/') }]
-              );
+              // Eliminamos la alerta duplicada y solo redirigimos directamente
+              router.replace('/');
               return;
             }
           }
@@ -164,11 +158,8 @@ export default function Register() {
       }
 
       console.log('Perfil creado exitosamente');
-      Alert.alert(
-        'Registro exitoso', 
-        '¡Tu cuenta ha sido creada correctamente!',
-        [{ text: 'OK', onPress: () => router.replace('/') }]
-      );
+      // Eliminamos la alerta duplicada y solo redirigimos directamente
+      router.replace('/');
     } catch (error: any) {
       console.error('Error en registro:', error);
       setError(`Error: ${error?.message || 'Ocurrió un error durante el registro'}`);
@@ -217,7 +208,7 @@ export default function Register() {
 
         <View style={styles.manualRegisterContainer}>
           <Text style={styles.manualRegisterText}>¿Prefieres registrarte manualmente?</Text>
-          <Link href="/auth/manual-register" asChild>
+          <Link href="/auth/manual-register" replace={true} asChild>
             <TouchableOpacity>
               <Text style={styles.manualRegisterLink}>Crear cuenta con email</Text>
             </TouchableOpacity>

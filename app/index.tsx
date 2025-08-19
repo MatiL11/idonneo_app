@@ -64,7 +64,7 @@ export default function Index() {
             <Text style={styles.taglineText}>IDÓNEO</Text>
           </View>
           <View style={styles.buttonWrapper}>
-            <Link href="/auth/login" style={styles.button}>
+            <Link href="/auth/login" replace={true} style={styles.button}>
               <Text style={styles.buttonText}>COMENZAR</Text>
             </Link>
           </View>
