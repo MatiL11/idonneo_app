@@ -1,10 +1,13 @@
 import { create } from 'zustand';
 import { Session, User } from '@supabase/supabase-js';
+import { signOut } from './auth';
+import { router } from 'expo-router';
 
 interface AuthState {
   session: Session | null;
   user: User | null;
   setSession: (session: Session | null) => void;
+  signOut: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -14,4 +17,9 @@ export const useAuthStore = create<AuthState>((set) => ({
     session,
     user: session?.user || null 
   }),
+  signOut: async () => {
+    await signOut();
+    set({ session: null, user: null });
+    router.replace('/');
+  },
 }));

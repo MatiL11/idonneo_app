@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Alert } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, Alert, Image, TouchableOpacity } from 'react-native';
 import { SocialButton } from '../../src/components/auth/SocialButton';
 import { signInWithGoogle, signInWithFacebook } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/lib/store';
 import * as WebBrowser from 'expo-web-browser';
-import { useRouter } from 'expo-router';
+import { useRouter, Link } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 
 // Inicializa WebBrowser
 WebBrowser.maybeCompleteAuthSession();
@@ -111,16 +112,25 @@ export default function Login() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <StatusBar style="light" />
       <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.title}>Estar fuerte</Text>
-          <Text style={styles.title}>y saludable</Text>
-          <Text style={styles.title}>es fácil,</Text>
-          <Text style={styles.title}>si sabés cómo.</Text>
+        <View style={styles.logoContainer}>
+          <Image 
+            source={require('../../assets/idonneo-logo-blanco.png')}
+            style={styles.logo}
+            resizeMode="contain"
+          />
+        </View>
+        
+        <View style={styles.taglineContainer}>
+          <Text style={styles.taglineText}>Estar fuerte</Text>
+          <Text style={styles.taglineText}>y saludable</Text>
+          <Text style={styles.taglineText}>es fácil,</Text>
+          <Text style={styles.taglineText}>si sabés cómo.</Text>
         </View>
 
         <View style={styles.buttonContainer}>
-          <Text style={styles.subtitle}>Iniciar sesión</Text>
+          <Text style={styles.subtitle}>INICIAR SESIÓN</Text>
           <SocialButton
             provider="facebook"
             onPress={() => !isLoading && handleSocialLogin('facebook')}
@@ -129,6 +139,15 @@ export default function Login() {
             provider="google"
             onPress={() => !isLoading && handleSocialLogin('google')}
           />
+          
+          <View style={styles.registerContainer}>
+            <Text style={styles.registerText}>¿No tienes una cuenta?</Text>
+            <Link href="/auth/register" asChild>
+              <TouchableOpacity>
+                <Text style={styles.registerLink}>Crear cuenta</Text>
+              </TouchableOpacity>
+            </Link>
+          </View>
         </View>
       </View>
     </SafeAreaView>
@@ -144,25 +163,57 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'space-between',
     padding: 24,
-    paddingTop: 60,
+    paddingTop: 30,
     paddingBottom: 40,
   },
-  header: {
-    marginBottom: 40,
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
   },
-  title: {
+  logo: {
+    width: 200,
+    height: 200,
+  },
+  taglineContainer: {
+    alignItems: 'flex-start',
+    alignSelf: 'flex-start',
+    marginBottom: 40,
+    paddingLeft: 10,
+  },
+  taglineText: {
     fontSize: 36,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 8,
+    lineHeight: 40,
+    letterSpacing: 1,
   },
   subtitle: {
     fontSize: 18,
+    fontWeight: 'bold',
     color: '#FFFFFF',
     marginBottom: 24,
     textAlign: 'center',
+    letterSpacing: 1,
   },
   buttonContainer: {
+    width: '100%',
     alignItems: 'center',
+  },
+  registerContainer: {
+    flexDirection: 'row',
+    marginTop: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  registerText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginRight: 6,
+  },
+  registerLink: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
   },
 });

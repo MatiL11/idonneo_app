@@ -69,3 +69,13 @@ export const signInWithFacebook = async (): Promise<AuthResponse> => {
     return handleAuthError(error, 'Facebook');
   }
 };
+
+export const signOut = async (): Promise<{ error?: AuthError }> => {
+  try {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    return {};
+  } catch (error) {
+    return handleAuthError(error, 'Sign Out');
+  }
+};

@@ -1,8 +1,9 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { useAuthStore } from '../src/lib/store';
 import { getUserProfile, Profile } from '../src/lib/profiles';
+import { StatusBar } from 'expo-status-bar';
 
 export default function Index() {
   const router = useRouter();
@@ -41,10 +42,26 @@ export default function Index() {
   if (!session) {
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>Bienvenido a IdonneoApp</Text>
-        <Link href="/auth/login" style={styles.link}>
-          <Text style={styles.linkText}>Iniciar Sesión</Text>
-        </Link>
+        <StatusBar style="light" />
+        <View style={styles.content}>
+          <View style={styles.logoContainer}>
+            <Image 
+              source={require('../assets/idonneo-logo-blanco.png')}
+              style={styles.logo}
+              resizeMode="contain"
+            />
+          </View>
+          <View style={styles.taglineContainer}>
+            <Text style={styles.taglineText}>SIMPLE</Text>
+            <Text style={styles.taglineText}>EFECTIVO</Text>
+            <Text style={styles.taglineText}>IDÓNEO</Text>
+          </View>
+          <View style={styles.buttonWrapper}>
+            <Link href="/auth/login" style={styles.button}>
+              <Text style={styles.buttonText}>COMENZAR</Text>
+            </Link>
+          </View>
+        </View>
       </View>
     );
   }
@@ -70,11 +87,39 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     padding: 20,
   },
-  title: {
-    fontSize: 24,
+  content: {
+    width: '100%',
+    maxWidth: 400,
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+  },
+  logoContainer: {
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  logo: {
+    width: 200,
+    height: 200,
+  },
+  taglineContainer: {
+    alignItems: 'flex-start',
+    alignSelf: 'flex-start',
+    marginBottom: 50,
+    paddingLeft: 20,
+  },
+  taglineText: {
+    fontSize: 36,
     fontWeight: 'bold',
     color: '#FFFFFF',
-    marginBottom: 20,
+    lineHeight: 40,
+    letterSpacing: 1,
+  },
+  title: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    marginBottom: 40,
     textAlign: 'center',
   },
   profileInfo: {
@@ -95,6 +140,28 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 24,
     borderRadius: 25,
+  },
+  buttonWrapper: {
+    width: '100%',
+    alignItems: 'center',
+    paddingBottom: 20,
+  },
+  button: {
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 15,
+    paddingHorizontal: 40,
+    borderRadius: 30,
+    width: '90%',
+    alignItems: 'center',
+    justifyContent: 'center', /* Añadido para centrar verticalmente */
+    height: 50, /* Altura fija para el botón */
+  },
+  buttonText: {
+    fontSize: 18, /* Aumentado el tamaño */
+    color: '#000000',
+    fontWeight: 'bold',
+    letterSpacing: 1,
+    textAlign: 'center', /* Aseguramos que el texto esté centrado */
   },
   linkText: {
     fontSize: 16,

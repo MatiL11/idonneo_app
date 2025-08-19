@@ -26,37 +26,48 @@ export function SocialButton({ provider, onPress, isLoading, text }: SocialButto
       activeOpacity={0.8}
       disabled={isLoading}
     >
-      <Image source={icons[provider]} style={styles.icon} />
-      <Text style={styles.text}>
-        {isLoading ? 'Cargando...' : (text || `Continuar con ${providerNames[provider]}`)}
-      </Text>
+      <View style={styles.contentContainer}>
+        <Image source={icons[provider]} style={styles.icon} />
+        <Text style={styles.text}>
+          {isLoading ? 'CARGANDO...' : (text || providerNames[provider].toUpperCase())}
+        </Text>
+      </View>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
   button: {
-    flexDirection: 'row',
-    alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 25,
-    paddingVertical: 12,
+    borderRadius: 30,
+    paddingVertical: 15,
     paddingHorizontal: 24,
     marginVertical: 8,
     width: '100%',
-    maxWidth: 280,
+    maxWidth: 300,
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   buttonDisabled: {
     opacity: 0.7,
   },
+  contentContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '60%',
+  },
   icon: {
     width: 24,
     height: 24,
-    marginRight: 12,
+    marginRight: 8,
   },
   text: {
-    fontSize: 16,
+    textAlign: 'center',
+    fontSize: 14,
     color: '#000000',
-    fontWeight: '500',
+    fontWeight: 'bold',
+    letterSpacing: 0.5,
   },
 });

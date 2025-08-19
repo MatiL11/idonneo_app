@@ -5,12 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '../../src/lib/store';
 
 export default function PerfilScreen() {
-  const { user } = useAuthStore();
+  const { user, signOut } = useAuthStore();
 
-  // Function to sign out - you would need to implement this in your auth logic
-  const handleSignOut = () => {
-    // This would typically call your authentication service
-    console.log('Sign out functionality needs to be implemented');
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   return (
