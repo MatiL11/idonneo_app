@@ -18,11 +18,46 @@ export async function getUserProfile(userId: string) {
       .eq('id', userId)
       .single();
     
-    if (error) throw error;
+    if (error) {
+      // Si el error es PGRST116, significa que no se encontró el perfil
+      // Esto es común después de la autenticación OAuth y no debe tratarse como error crítico
+      if (error.code === 'PGRST116') {
+        console.log(`No se encontró perfil para el usuario ${userId} - Es posible que sea un nuevo registro`);
+        return { profile: null, error: { code: 'PROFILE_NOT_FOUND', message: 'Perfil no encontrado' } };
+      }
+      throw error;
+    }
     
     return { profile: data as Profile, error: null };
-  } catch (error) {
-    console.error('Error fetching profile:', error);
+  } catch (error: any) {
+    console.error('Error al obtener el perfil:', error.message || error);
     return { profile: null, error };
+  }
+}
+
+/**
+ * Verifica si existe un perfil para el ID de usuario proporcionado
+ * Útil para comprobar si un usuario necesita completar el registro después de OAuth
+ */
+export async function profileExists(userId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single();
+    
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // No se encontró el perfil
+        return false;
+      }
+      throw error;
+    }
+    
+    return !!data; // Retorna true si el perfil existe
+  } catch (error) {
+    console.log('Error al verificar perfil:', error);
+    return false;
   }
 }

@@ -21,8 +21,15 @@ export default function Index() {
           // Redirigir a la sección de tabs
           router.replace('/(tabs)/newsletter');
         } else {
-          console.log('No se encontró el perfil:', error);
-          router.replace('/auth/register');
+          // Si el error es específicamente que el perfil no se encontró,
+          // redirigimos al proceso de registro
+          if (error && error.code === 'PROFILE_NOT_FOUND') {
+            console.log('Usuario nuevo, redirigiendo a la pantalla de registro');
+            router.replace('/auth/register');
+          } else {
+            console.log('Error al obtener el perfil:', error);
+            router.replace('/auth/register');
+          }
         }
       }
       setLoading(false);

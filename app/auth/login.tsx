@@ -142,7 +142,7 @@ export default function Login() {
           
           <View style={styles.registerContainer}>
             <Text style={styles.registerText}>¿No tienes una cuenta?</Text>
-            <Link href="/auth/register" asChild>
+            <Link href="/auth/manual-register" asChild>
               <TouchableOpacity>
                 <Text style={styles.registerLink}>Crear cuenta</Text>
               </TouchableOpacity>
