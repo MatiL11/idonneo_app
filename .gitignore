@@ -9,6 +9,10 @@ dist/
 web-build/
 expo-env.d.ts
 
+# Configuration files
+# app.json
+# eas.json
+
 # Native
 .kotlin/
 *.orig.*
@@ -20,18 +24,56 @@ expo-env.d.ts
 
 # Metro
 .metro-health-check*
+.metro/
 
 # debug
 npm-debug.*
 yarn-debug.*
 yarn-error.*
+logfile*
 
 # macOS
 .DS_Store
 *.pem
 
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
 # local env files
+.env
+.env.*
 .env*.local
+!.env.example
 
 # typescript
 *.tsbuildinfo
+
+# Build directories
+build/
+android/app/build/
+ios/build/
+ios/Pods/
+
+# IDE specific files
+.idea/
+.vscode/
+*.swp
+*.swo
+*.swn
+.project
+.classpath
+*.iml
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Local Netlify folder
+.netlify
