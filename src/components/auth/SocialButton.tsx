@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, TouchableOpacity, Text, View, Image } from 'react-native';
 
 interface SocialButtonProps {
-  provider: 'facebook' | 'google';
+  provider: 'facebook' | 'google' | 'apple';
   onPress: () => void;
   isLoading?: boolean;
   text?: string;
@@ -11,11 +11,13 @@ interface SocialButtonProps {
 const icons = {
   facebook: require('../../../assets/facebook-icon.png'),
   google: require('../../../assets/google-icon.png'),
+  apple: require('../../../assets/apple-icon.png'), // Necesitarás crear este icono
 };
 
 const providerNames = {
   facebook: 'Facebook',
   google: 'Google',
+  apple: 'Apple',
 };
 
 export function SocialButton({ provider, onPress, isLoading, text }: SocialButtonProps) {
@@ -40,14 +42,20 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: '#FFFFFF',
     borderRadius: 30,
-    paddingVertical: 15,
+    paddingVertical: 12,
     paddingHorizontal: 24,
     marginVertical: 8,
-    width: '100%',
-    maxWidth: 300,
-    height: 50,
+    width: '80%',
+    maxWidth: 320,
+    height: 42, // Altura consistente para todos los botones
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 2,
+    shadowColor: "#FFFFFF40",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    position: 'relative', // Para posicionamiento relativo
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -55,19 +63,23 @@ const styles = StyleSheet.create({
   contentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: '60%',
+    justifyContent: 'flex-start',
+    width: '50%',
+    position: 'relative',
   },
   icon: {
     width: 24,
     height: 24,
-    marginRight: 8,
+    marginRight: 12,
+    position: 'absolute', // Posicionamiento absoluto
+    left: 0, // Alineado a la izquierda
   },
   text: {
-    textAlign: 'center',
-    fontSize: 14,
+    fontSize: 16,
     color: '#000000',
-    fontWeight: 'bold',
+    fontWeight: '600',
     letterSpacing: 0.5,
+    position: 'absolute', // Posicionamiento absoluto
+    left: 36, // Posición fija para el texto (24px del icono + 12px de margen)
   },
 });

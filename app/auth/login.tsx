@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, Alert, Image, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, SafeAreaView, Alert, Image, Platform } from 'react-native';
 import { SocialButton } from '../../src/components/auth/SocialButton';
-import { signInWithGoogle, signInWithFacebook } from '../../src/lib/auth';
+import { signInWithGoogle, signInWithFacebook, signInWithApple } from '../../src/lib/auth';
 import { supabase } from '../../src/lib/supabase';
 import { useAuthStore } from '../../src/lib/store';
+import { Session } from '@supabase/supabase-js';
 import { logger } from '../../src/lib/logger';
 import * as WebBrowser from 'expo-web-browser';
-import { useRouter, Link } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as AppleAuthentication from 'expo-apple-authentication';
+import { profileExists } from '../../src/lib/profiles';
 
 // Inicializa WebBrowser
 WebBrowser.maybeCompleteAuthSession();
@@ -15,65 +18,206 @@ WebBrowser.maybeCompleteAuthSession();
 export default function Login() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [emailLoginLoading, setEmailLoginLoading] = useState(false);
-  const [emailError, setEmailError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
+  // Eliminamos estados relacionados con login de email/contraseña
+  const [appleAuthAvailable, setAppleAuthAvailable] = useState(false);
   const setSession = useAuthStore((state) => state.setSession);
+  
+  // Verificar si Sign in with Apple está disponible (solo en iOS)
+  useEffect(() => {
+    if (Platform.OS === 'ios') {
+      AppleAuthentication.isAvailableAsync().then(
+        available => setAppleAuthAvailable(available)
+      );
+    }
+  }, []);
 
-  const handleSocialLogin = async (provider: 'facebook' | 'google') => {
+  const handleSocialLogin = async (provider: 'facebook' | 'google' | 'apple') => {
     try {
+      // Limpiamos cualquier sesión anterior para evitar conflictos
+      await supabase.auth.signOut();
+      
       setIsLoading(true);
       logger.log(`Iniciando login con ${provider}`);
-      const response = await (provider === 'google' ? signInWithGoogle() : signInWithFacebook());
+      let response;
+      if (provider === 'google') {
+        response = await signInWithGoogle();
+      } else if (provider === 'facebook') {
+        response = await signInWithFacebook();
+      } else if (provider === 'apple') {
+        response = await signInWithApple();
+      } else {
+        throw new Error(`Proveedor no soportado: ${provider}`);
+      }
       
       if (response.error) {
         logger.error('Error en respuesta de autenticación social', response.error);
-        // Mensaje de error amigable para el usuario
-        Alert.alert('No se pudo iniciar sesión', 'Hubo un problema al conectar con tu cuenta. Por favor intenta nuevamente.');
+        
+        // Mensajes más específicos según el tipo de error
+        const errorMsg = response.error.message || '';
+        
+        if (errorMsg.includes('email already registered') || 
+            errorMsg.includes('already been registered') || 
+            errorMsg.includes('already exists') ||
+            errorMsg.includes('account conflict')) {
+          Alert.alert(
+            'Email ya registrado', 
+            'Este correo está registrado con otro método de inicio de sesión. Por favor, usa ese método.',
+            [
+              { text: 'Entendido', style: 'default' }
+            ]
+          );
+        } else if (errorMsg.includes('La autenticación con Apple en desarrollo')) {
+          // Error específico de Apple en desarrollo
+          Alert.alert('Autenticación con Apple', errorMsg);
+        } else {
+          // Mensaje de error genérico
+          Alert.alert('No se pudo iniciar sesión', 'Hubo un problema al conectar con tu cuenta. Por favor intenta nuevamente.');
+        }
         return;
       }
       
-      if (response.url) {
+      // Para Apple, necesitamos un manejo especial
+      if (provider === 'apple') {
+        // Si hay un error, lo mostramos
+        if (response?.error) {
+          Alert.alert(
+            "Autenticación con Apple", 
+            (response.error as Error).message || "Error durante la autenticación con Apple"
+          );
+          return;
+        }
+        
+        // Si no hay error ni URL, fue una autenticación nativa exitosa
+        if (!response?.url) {
+          // Verificamos si tenemos sesión
+          const { data } = await supabase.auth.getSession();
+          if (data?.session) {
+            setSession(data.session);
+            router.replace('/');
+          }
+          return;
+        }
+      }
+      // Continuamos con flujo normal para otros casos
+      
+      if (response?.url) {
         logger.log('URL de autenticación:', response.url);
         logger.log('Abriendo sesión de autenticación...');
+        logger.log('============================');
+        logger.log('URL para abrir navegador:', response.url);
+        
+        // Siempre usamos nuestro esquema personalizado para redirección
+        const redirectUrl = 'idonneoapp://auth/callback';
+        
+        logger.log('URL de retorno configurada:', redirectUrl);
+        logger.log('============================');
+        
         const result = await WebBrowser.openAuthSessionAsync(
           response.url,
-          'idonneoapp://'
+          redirectUrl // Siempre usamos nuestro esquema personalizado
         );
         
-        logger.log('Resultado de autenticación:', result);
-        if (result.type === 'success' && result.url) {
+        logger.log('============================');
+        logger.log('RESULTADO DE AUTENTICACIÓN:');
+        logger.log('Tipo de resultado:', result.type);
+        if ('url' in result) {
+          logger.log('URL de retorno:', result.url);
+        } else {
+          logger.log('No hay URL de retorno en el resultado');
+        }
+        logger.log('Objeto resultado completo:', JSON.stringify(result, null, 2));
+        logger.log('============================');
+        // Verificar el tipo de resultado y si contiene una URL
+        const isSuccessWithUrl = result.type === 'success' && 'url' in result && result.url;
+        
+        logger.log('¿Éxito con URL?', isSuccessWithUrl ? 'SÍ' : 'NO');
+        
+        if (isSuccessWithUrl) {
           try {
+            logger.log('============================');
+            logger.log('PROCESANDO URL DE RETORNO:');
+            logger.log('URL completa de retorno:', result.url);
+            
             const url = new URL(result.url);
+            logger.log('Protocolo:', url.protocol);
+            logger.log('Host:', url.host);
+            logger.log('Pathname:', url.pathname);
+            logger.log('Search params:', url.search);
+            
+            // Mostrar todos los parámetros en la URL
+            logger.log('Todos los parámetros:');
+            url.searchParams.forEach((value, key) => {
+              logger.log(`- ${key}: ${value}`);
+            });
+            
             const authCode = url.searchParams.get('code');
+            logger.log('Código de autorización encontrado:', authCode ? 'SÍ' : 'NO');
+            logger.log('============================');
             
             if (!authCode) {
               logger.error('No se encontró código de autorización en la URL');
+              logger.log('Params en URL:', Array.from(url.searchParams.entries()));
               Alert.alert('Error de autenticación', 'No se pudo completar el inicio de sesión. Intenta nuevamente.');
               return;
             }
             
             logger.log('Código de autorización recibido, intercambiando por tokens...');
             
-            // Intercambiar el código por tokens (esto lo maneja Supabase automáticamente)
-            const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(authCode);
-
-            if (sessionError) {
-              logger.error('Error setting session', sessionError);
-              Alert.alert('Problema de sesión', 'No pudimos iniciar tu sesión. Por favor intenta nuevamente.');
+            // Verificar detalles de la URL para depuración
+            logger.log('URL completa:', result.url);
+            const urlParams = new URL(result.url).searchParams;
+            logger.log('Parámetros en URL:', Array.from(urlParams.entries()));
+            
+            // Intercambiar el código por tokens con manejo de errores más robusto
+            let sessionData;
+            try {
+              // Aseguramos que tenemos un código limpio sin espacios extra
+              const cleanAuthCode = authCode.trim();
+              
+              // Intentamos el intercambio de código a sesión
+              logger.log('Intercambiando código por sesión:', cleanAuthCode);
+              const { data, error: sessionError } = await supabase.auth.exchangeCodeForSession(cleanAuthCode);
+              
+              if (sessionError) {
+                logger.error('Error setting session', sessionError);
+                
+                // Si hay un error con el flujo, intentar iniciar sesión desde cero
+                if (sessionError.message.includes('invalid flow state')) {
+                  Alert.alert(
+                    'Error de sesión',
+                    'Hubo un problema con la autenticación. ¿Deseas intentar nuevamente?',
+                    [
+                      {
+                        text: 'Cancelar',
+                        style: 'cancel'
+                      },
+                      {
+                        text: 'Intentar de nuevo',
+                        onPress: () => handleSocialLogin(provider)
+                      }
+                    ]
+                  );
+                } else {
+                  Alert.alert('Problema de sesión', 'No pudimos iniciar tu sesión. Por favor intenta nuevamente.');
+                }
+                return;
+              }
+              
+              sessionData = data;
+            } catch (exchangeError) {
+              logger.error('Error al intercambiar código por sesión:', exchangeError);
+              Alert.alert('Problema de conexión', 'Hubo un error al verificar tu identidad. Por favor intenta nuevamente.');
               return;
             }
             
             // Verificar si tenemos una sesión válida
-            if (!data || !data.session) {
+            if (!sessionData || !sessionData.session) {
               logger.error('No se obtuvo una sesión válida');
               Alert.alert('Sesión no disponible', 'No pudimos verificar tu identidad. Por favor intenta iniciar sesión nuevamente.');
               return;
             }
             
-            const session = data.session;
+            const session = sessionData.session;
             logger.log('Sesión establecida correctamente');
             
             // Verificar si el usuario tiene un perfil
@@ -84,28 +228,33 @@ export default function Login() {
               .single();
 
             if (profileError && profileError.code === 'PGRST116') {
-              // No se encontró el perfil
-              Alert.alert(
-                'Cuenta no encontrada',
-                'No encontramos una cuenta existente. ¿Deseas crear una nueva cuenta?',
-                [
-                  {
-                    text: 'Cancelar',
-                    style: 'cancel',
-                    onPress: async () => {
-                      // Cerrar la sesión ya que no tiene perfil
-                      await supabase.auth.signOut();
+              // No se encontró el perfil - creamos uno automáticamente
+              logger.log('Perfil no encontrado, creando automáticamente...');
+              
+              const profileCreated = await createUserProfile(session);
+              
+              if (profileCreated) {
+                // Perfil creado exitosamente
+                logger.log('Perfil creado automáticamente, redirigiendo a inicio');
+                setSession(session);
+                router.replace('/'); // Redirigir directamente a la página principal
+              } else {
+                // Error al crear el perfil
+                Alert.alert(
+                  'Error al crear cuenta',
+                  'No pudimos crear tu perfil automáticamente. Por favor intenta nuevamente.',
+                  [
+                    {
+                      text: 'Entendido',
+                      style: 'default',
+                      onPress: async () => {
+                        // Cerrar la sesión ya que no se pudo crear el perfil
+                        await supabase.auth.signOut();
+                      }
                     }
-                  },
-                  {
-                    text: 'Crear cuenta',
-                    onPress: () => {
-                      setSession(session); // Guardamos la sesión primero
-                      router.replace('/auth/register'); // Usamos replace en lugar de push para evitar acumular historial
-                    }
-                  }
-                ]
-              );
+                  ]
+                );
+              }
               return;
             }
 
@@ -131,75 +280,73 @@ export default function Login() {
     }
   };
 
-  const validateEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isValid = emailRegex.test(email);
-    setEmailError(isValid ? '' : 'Ingresa un email válido');
-    return isValid;
-  };
-
-  const validatePassword = (password: string): boolean => {
-    const isValid = password.length >= 6;
-    setPasswordError(isValid ? '' : 'La contraseña debe tener al menos 6 caracteres');
-    return isValid;
-  };
-
-  const handleEmailLogin = async () => {
-    if (!validateEmail(email) || !validatePassword(password)) {
-      return;
-    }
-
+  // No necesitamos las funciones de validación y login con email/contraseña
+  // ya que solo permitiremos autenticación social
+  
+  // Función para crear automáticamente el perfil de un usuario nuevo
+  const createUserProfile = async (session: Session) => {
     try {
-      setEmailLoginLoading(true);
+      logger.log("Iniciando creación de perfil automática...");
       
-      // Limpiamos cualquier sesión anterior para evitar conflictos
-      await supabase.auth.signOut();
+      if (!session?.user) {
+        logger.error("Error: No hay sesión de usuario");
+        return false;
+      }
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
-
-      if (error) {
-        // Solo registramos el error en la consola para depuración
-        logger.error('Error al iniciar sesión', error);
-        
-        // Mensajes más amigables según el tipo de error
-        if (error.message.includes('Invalid login credentials')) {
-          Alert.alert('Error de acceso', 'Email o contraseña incorrectos');
-        } else if (error.message.includes('Email not confirmed')) {
-          Alert.alert('Cuenta no verificada', 'Por favor confirma tu email antes de iniciar sesión');
-        } else {
-          // Para cualquier otro error, mostramos un mensaje genérico
-          Alert.alert('Error de acceso', 'No se pudo iniciar sesión. Verifica tus datos e intenta nuevamente.');
-        }
-        return;
+      // Extraer metadatos del usuario
+      const userData = session.user.user_metadata || {};
+      logger.log("Metadatos de usuario:", userData);
+      
+      // Manejar diferentes formatos posibles de nombre completo
+      let firstName = '';
+      let lastName = '';
+      
+      if (userData.full_name) {
+        const nameParts = userData.full_name.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      } else if (userData.name) {
+        const nameParts = userData.name.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
       }
-
-      if (data?.session) {
-        console.log('Inicio de sesión exitoso con email');
+      
+      // Generar nombre de usuario único
+      const timestamp = Date.now().toString().slice(-6);
+      const randomString = Math.random().toString(36).substring(2, 6);
+      let baseUsername = userData.name || userData.email?.split('@')[0] || `user`;
+      // Normalizar el username
+      baseUsername = baseUsername.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase();
+      // Crear username único
+      const username = `${baseUsername}_${timestamp}_${randomString}`;
+      
+      logger.log("Datos procesados:", { firstName, lastName, username });
+      
+      // Crear el perfil
+      const { error: createError } = await supabase
+        .from('profiles')
+        .insert([
+          {
+            id: session.user.id,
+            username: username,
+            first_name: firstName,
+            last_name: lastName,
+            avatar_url: userData.avatar_url || null,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+        ]);
         
-        // Verificamos que la sesión tenga tokens válidos
-        if (!data.session.access_token || !data.session.refresh_token) {
-          console.error('Error: Tokens de sesión inválidos');
-          Alert.alert('Error', 'La sesión no contiene tokens válidos');
-          return;
-        }
-        
-        // Simplemente establecemos la sesión y redirigimos sin mostrar alertas adicionales
-        // para evitar la duplicación de mensajes
-        setSession(data.session);
-        router.replace('/');
-      } else {
-        console.error('No se recibió una sesión válida');
-        Alert.alert('Error', 'No se recibió información de sesión');
+      if (createError) {
+        logger.error('Error creating profile:', createError);
+        return false;
       }
+      
+      logger.log('Perfil creado exitosamente');
+      return true;
     } catch (error) {
-      logger.error('Error inesperado al iniciar sesión', error);
-      // Mensaje de error genérico y amigable
-      Alert.alert('Problema de conexión', 'No pudimos completar tu solicitud. Por favor, intenta nuevamente más tarde.');
-    } finally {
-      setEmailLoginLoading(false);
+      logger.error('Error en creación de perfil:', error);
+      return false;
     }
   };
 
@@ -207,14 +354,6 @@ export default function Login() {
     <SafeAreaView style={styles.container}>
       <StatusBar style="light" />
       <View style={styles.content}>
-        <View style={styles.logoContainer}>
-          <Image 
-            source={require('../../assets/idonneo-logo-blanco.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-        
         <View style={styles.taglineContainer}>
           <Text style={styles.taglineText}>Estar fuerte</Text>
           <Text style={styles.taglineText}>y saludable</Text>
@@ -223,58 +362,8 @@ export default function Login() {
         </View>
 
         <View style={styles.buttonContainer}>
-          {/* Formulario de inicio de sesión con email */}
-          <View style={styles.formContainer}>
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, emailError ? styles.inputError : null]}
-                placeholder="Email"
-                placeholderTextColor="#AAAAAA"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                value={email}
-                onChangeText={(text) => {
-                  setEmail(text);
-                  if (emailError) validateEmail(text);
-                }}
-                onBlur={() => validateEmail(email)}
-              />
-              {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-            </View>
-
-            <View style={styles.inputContainer}>
-              <TextInput
-                style={[styles.input, passwordError ? styles.inputError : null]}
-                placeholder="Contraseña"
-                placeholderTextColor="#AAAAAA"
-                secureTextEntry
-                value={password}
-                onChangeText={(text) => {
-                  setPassword(text);
-                  if (passwordError) validatePassword(text);
-                }}
-                onBlur={() => validatePassword(password)}
-              />
-              {passwordError ? <Text style={styles.errorText}>{passwordError}</Text> : null}
-            </View>
-
-            <TouchableOpacity 
-              style={styles.loginButton} 
-              onPress={handleEmailLogin}
-              disabled={emailLoginLoading}
-            >
-              {emailLoginLoading ? (
-                <ActivityIndicator color="#000000" />
-              ) : (
-                <Text style={styles.loginButtonText}>INICIAR SESIÓN</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-          
-          <View style={styles.orContainer}>
-            <View style={styles.divider} />
-            <Text style={styles.orText}>O</Text>
-            <View style={styles.divider} />
+          <View style={styles.socialLoginContainer}>
+            <Text style={styles.socialLoginText}>Iniciar sesión</Text>
           </View>
           
           <SocialButton
@@ -286,14 +375,12 @@ export default function Login() {
             onPress={() => !isLoading && handleSocialLogin('google')}
           />
           
-          <View style={styles.registerContainer}>
-            <Text style={styles.registerText}>¿No tienes una cuenta?</Text>
-            <Link href="/auth/manual-register" replace={true} asChild>
-              <TouchableOpacity>
-                <Text style={styles.registerLink}>Crear cuenta</Text>
-              </TouchableOpacity>
-            </Link>
-          </View>
+          {Platform.OS === 'ios' && appleAuthAvailable && (
+            <SocialButton
+              provider="apple"
+              onPress={() => !isLoading && handleSocialLogin('apple')}
+            />
+          )}
         </View>
       </View>
     </SafeAreaView>
@@ -308,113 +395,36 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     justifyContent: 'space-between',
+    alignItems: 'center',
     padding: 24,
     paddingTop: 30,
     paddingBottom: 40,
   },
-  logoContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-    paddingTop: 10,
-  },
-  logo: {
-    width: 80,
-    height: 80,
-  },
   taglineContainer: {
     alignItems: 'flex-start',
-    alignSelf: 'flex-start',
-    paddingLeft: 10,
+    alignSelf: 'center',
+    paddingTop: 80,
+    width: '90%',
   },
   taglineText: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: 48,
+    fontWeight: '800',
     color: '#FFFFFF',
-    lineHeight: 40,
-    letterSpacing: 1,
-  },
-  subtitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginBottom: 24,
-    textAlign: 'center',
-    letterSpacing: 1,
+    lineHeight: 48,
   },
   buttonContainer: {
     width: '100%',
     alignItems: 'center',
   },
-  registerContainer: {
-    flexDirection: 'row',
-    marginTop: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  registerText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    marginRight: 6,
-  },
-  registerLink: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: 'bold',
-    textDecorationLine: 'underline',
-  },
-  formContainer: {
+  socialLoginContainer: {
     width: '100%',
     marginBottom: 20,
-  },
-  inputContainer: {
-    marginBottom: 16,
-    width: '100%',
-  },
-  input: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: '#000000',
-    width: '100%',
-  },
-  inputError: {
-    borderColor: '#FF6B6B',
-    borderWidth: 1,
-  },
-  errorText: {
-    color: '#FF6B6B',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  loginButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 30,
-    padding: 14,
     alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 10,
   },
-  loginButtonText: {
-    color: '#000000',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 1,
-  },
-  orContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 20,
-    width: '100%',
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#FFFFFF40',
-  },
-  orText: {
+  socialLoginText: {
     color: '#FFFFFF',
-    marginHorizontal: 10,
-    fontSize: 14,
+    fontSize: 20,
+    fontWeight: '600',
+    marginBottom: 20,
   },
 });

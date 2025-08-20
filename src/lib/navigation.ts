@@ -13,12 +13,11 @@ export const navigateAndReplace = (path: string) => {
 };
 
 /**
- * Navega a una ruta de autenticación específica
+ * Navega a la pantalla de login
  * siempre reemplazando la entrada actual del historial
- * @param authRoute Ruta de autenticación ('login', 'register', 'manual-register')
  */
-export const navigateToAuth = (authRoute: 'login' | 'register' | 'manual-register') => {
-  router.replace(`/auth/${authRoute}`);
+export const navigateToAuth = () => {
+  router.replace('/auth/login');
 };
 
 /**

@@ -6,40 +6,43 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash.png",
+      "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
     "ios": {
+      "bundleIdentifier": "com.idonneoapp.app",
       "supportsTablet": true,
-      "bundleIdentifier": "com.idonneoapp.app"
+      "usesAppleSignIn": true
     },
     "android": {
+      "package": "com.idonneoapp.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.idonneoapp.app",
       "edgeToEdgeEnabled": true
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    },
     "scheme": "idonneoapp",
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "expo-web-browser",
+      "expo-apple-authentication"
     ],
     "extra": {
+      "eas": {
+        "projectId": "92d0aa71-9914-4c14-9f74-33c1f0c96f57"
+      },
       "router": {
         "origin": "./app"
-      },
-      "eas": {
-        "projectId": "4c2ecf8a-e6f5-487f-9dc3-12b80aa50e70"
       }
-    }
+    },
+    "owner": "matil11"
   }
 }

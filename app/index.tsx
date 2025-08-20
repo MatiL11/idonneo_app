@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '../src/lib/store';
 import { getUserProfile, Profile } from '../src/lib/profiles';
 import { StatusBar } from 'expo-status-bar';
+import { supabase } from '../src/lib/supabase';
 
 export default function Index() {
   const router = useRouter();
@@ -21,15 +22,13 @@ export default function Index() {
           // Redirigir a la sección de tabs
           router.replace('/(tabs)/newsletter');
         } else {
-          // Si el error es específicamente que el perfil no se encontró,
-          // redirigimos al proceso de registro
-          if (error && error.code === 'PROFILE_NOT_FOUND') {
-            console.log('Usuario nuevo, redirigiendo a la pantalla de registro');
-            router.replace('/auth/register');
-          } else {
-            console.log('Error al obtener el perfil:', error);
-            router.replace('/auth/register');
-          }
+          // Si hay un error al obtener el perfil (no debería ocurrir con el nuevo flujo),
+          // redirigimos al proceso de login para intentar nuevamente
+          console.log('Error al obtener el perfil:', error);
+          
+          // Cerrar la sesión actual y redirigir a login
+          await supabase.auth.signOut();
+          router.replace('/auth/login');
         }
       }
       setLoading(false);
@@ -106,8 +105,9 @@ const styles = StyleSheet.create({
     marginBottom: 30,
   },
   logo: {
-    width: 200,
-    height: 200,
+    width: 300,
+    height: 300,
+    marginBottom: 30,
   },
   taglineContainer: {
     alignItems: 'flex-start',
@@ -116,11 +116,11 @@ const styles = StyleSheet.create({
     paddingLeft: 20,
   },
   taglineText: {
-    fontSize: 36,
-    fontWeight: 'bold',
+    fontSize: 42,
+    fontWeight: '900',
     color: '#FFFFFF',
-    lineHeight: 40,
-    letterSpacing: 1,
+    lineHeight: 48,
+    letterSpacing: 2,
   },
   title: {
     fontSize: 32,
@@ -152,6 +152,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     paddingBottom: 20,
+    marginTop: 30,
   },
   button: {
     backgroundColor: '#FFFFFF',
@@ -160,15 +161,20 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     width: '90%',
     alignItems: 'center',
-    justifyContent: 'center', /* Añadido para centrar verticalmente */
-    height: 50, /* Altura fija para el botón */
+    justifyContent: 'center',
+    height: 55,
+    elevation: 3, // sombra en Android
+    shadowColor: "#FFFFFF", // sombra en iOS
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
   buttonText: {
-    fontSize: 18, /* Aumentado el tamaño */
+    fontSize: 20,
     color: '#000000',
-    fontWeight: 'bold',
-    letterSpacing: 1,
-    textAlign: 'center', /* Aseguramos que el texto esté centrado */
+    fontWeight: '800',
+    letterSpacing: 2,
+    textAlign: 'center',
   },
   linkText: {
     fontSize: 16,
