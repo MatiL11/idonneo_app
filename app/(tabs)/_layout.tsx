@@ -12,11 +12,11 @@ export default function TabsLayout() {
         tabBarActiveTintColor: '#2C6ECB',
         tabBarInactiveTintColor: 'gray',
         tabBarStyle: {
-          backgroundColor: isDarkMode ? '#121212' : '#FFFFFF',
+          backgroundColor: isDarkMode ? '#000000' : '#FFFFFF',
           borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
-          height: 60,
+          height: 70,
           paddingBottom: 5,
         },
         headerStyle: {
@@ -35,7 +35,7 @@ export default function TabsLayout() {
             tabBarIcon: ({ color, size }) => (
                 <MaterialIcons name="article" size={size} color={color} />
             ),
-            headerTitle: 'Newsletter',
+            headerShown: false,
             }}
         />
         <Tabs.Screen

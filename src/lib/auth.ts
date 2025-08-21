@@ -131,12 +131,6 @@ export const signInWithApple = async (): Promise<AuthResponse> => {
       nonce: hashedNonce,
     })
 
-    console.log('============================')
-    console.log('APPLE AUTH DETAILS:')
-    console.log('Apple authentication successful')
-    console.log('Identity token available:', !!credential.identityToken)
-    console.log('============================')
-
     if (!credential.identityToken) {
       throw new Error('No identity token provided by Apple')
     }

@@ -5,13 +5,14 @@ interface SocialButtonProps {
   provider: 'facebook' | 'google' | 'apple';
   onPress: () => void;
   isLoading?: boolean;
+  disabled?: boolean;
   text?: string;
 }
 
 const icons = {
   facebook: require('../../../assets/facebook-icon.png'),
   google: require('../../../assets/google-icon.png'),
-  apple: require('../../../assets/apple-icon.png'), // Necesitarás crear este icono
+  apple: require('../../../assets/apple-icon.png'), // Asegúrate de tener este icono
 };
 
 const providerNames = {
@@ -20,13 +21,21 @@ const providerNames = {
   apple: 'Apple',
 };
 
-export function SocialButton({ provider, onPress, isLoading, text }: SocialButtonProps) {
+export function SocialButton({
+  provider,
+  onPress,
+  isLoading = false,
+  disabled = false,
+  text,
+}: SocialButtonProps) {
+  const isButtonDisabled = isLoading || disabled;
+
   return (
     <TouchableOpacity
-      style={[styles.button, isLoading && styles.buttonDisabled]}
+      style={[styles.button, isButtonDisabled && styles.buttonDisabled]}
       onPress={onPress}
       activeOpacity={0.8}
-      disabled={isLoading}
+      disabled={isButtonDisabled}
     >
       <View style={styles.contentContainer}>
         <Image source={icons[provider]} style={styles.icon} />
@@ -51,11 +60,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: "#FFFFFF40",
+    shadowColor: '#FFFFFF40',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    position: 'relative', // Para posicionamiento relativo
+    position: 'relative',
   },
   buttonDisabled: {
     opacity: 0.7,
@@ -71,15 +80,15 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     marginRight: 12,
-    position: 'absolute', // Posicionamiento absoluto
-    left: 0, // Alineado a la izquierda
+    position: 'absolute',
+    left: 0,
   },
   text: {
     fontSize: 16,
     color: '#000000',
     fontWeight: '600',
     letterSpacing: 0.5,
-    position: 'absolute', // Posicionamiento absoluto
-    left: 36, // Posición fija para el texto (24px del icono + 12px de margen)
+    position: 'absolute',
+    left: 36, // icono (24px) + margen (12px)
   },
 });
