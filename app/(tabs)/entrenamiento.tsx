@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
 import WeeklyStrip from '../../src/components/training/WeeklyStrip';
 import TopMiniNav, { TopMiniTab } from '../../src/components/training/TopMiniNav';
 import SearchPane from '../training/search';
@@ -19,7 +20,7 @@ export default function EntrenamientoScreen() {
   const router = useRouter();
   const [topTab, setTopTab] = useState<TopMiniTab>('overview');
 
-  const goToCalendar = () => router.push('/entrenamiento/calendar');
+  const goToCalendar = () => router.push('/training/calendar');
 
   return (
     <View style={styles.root}>
@@ -30,9 +31,20 @@ export default function EntrenamientoScreen() {
         {topTab === 'overview' ? (
           <>
             {/* Bloque negro clickeable */}
-            <TouchableOpacity activeOpacity={0.9} onPress={goToCalendar} style={styles.topPanel}>
-              <Text style={styles.weekTitle}>ESTA SEMANA</Text>
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={goToCalendar}
+              style={styles.topPanel}
+              accessibilityRole="button"
+              accessibilityLabel="Abrir calendario completo"
+            >
+              <View style={styles.topHeaderRow}>
+                <Text style={styles.weekTitle}>ESTA SEMANA</Text>
+                <Ionicons name="chevron-forward" size={22} color={COLORS.white} />
+              </View>
+
               <WeeklyStrip />
+
               <View style={styles.todayCard}>
                 <Text style={styles.todayLabel}>Entrenamiento de hoy</Text>
                 <View style={styles.emptySlot}>
@@ -73,9 +85,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.black },
   safeTop: { flex: 1, backgroundColor: COLORS.black },
 
-  /** Mini nav deja aire debajo */
-  // (si tu TopMiniNav ya le da marginBottom, podés quitarlo de allí)
-  // wrapeado por SafeArea: no tapa al panel blanco
   topPanel: {
     backgroundColor: COLORS.black,
     paddingHorizontal: 20,
@@ -84,13 +93,26 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: RADII.panel,
     borderBottomRightRadius: RADII.panel,
   },
-  weekTitle: { color: COLORS.white, fontWeight: '700', letterSpacing: 0.2, marginBottom: 6 },
+
+  topHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+
+  weekTitle: { color: COLORS.white, fontWeight: '700', letterSpacing: 0.2 },
+
   todayCard: { marginTop: 10 },
   todayLabel: { color: COLORS.white, fontWeight: '600', marginBottom: 6 },
-  emptySlot: { backgroundColor: '#2a2a2a', borderRadius: RADII.card, paddingVertical: 12, paddingHorizontal: 14 },
+  emptySlot: {
+    backgroundColor: '#2a2a2a',
+    borderRadius: RADII.card,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
   emptySlotText: { color: '#d1d1d1', fontWeight: '500' },
 
-  /** Panel blanco reutilizable */
   panel: {
     flex: 1,
     backgroundColor: COLORS.white,
@@ -98,7 +120,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: RADII.panel,
     paddingTop: 16,
     paddingHorizontal: 20,
-    overflow: 'hidden', // evita “medias lunas” visuales al recortar hijos
+    overflow: 'hidden',
   },
 
   sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.black, marginBottom: 12 },
