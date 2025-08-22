@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { Alert } from 'react-native';
-import type { Article } from '../types/article';
-import { fetchAllArticles, fetchSavedIds, saveArticle, unsaveArticle } from '../services/articles';
+import type { Article } from '../types/index';
+import { fetchAllArticles, fetchSavedIds, saveArticle, unsaveArticle } from '../services/index';
 
 export type TabKey = 'all' | 'saved';
 

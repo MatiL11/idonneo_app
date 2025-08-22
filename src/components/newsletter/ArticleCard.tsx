@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS, RADII, SIZES } from '../../styles/tokens';
-import type { Article } from '../../types/article';
+import type { Article } from '../../types/index';
 
 type Props = {
   article: Article;

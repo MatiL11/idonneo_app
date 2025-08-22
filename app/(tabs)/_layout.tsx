@@ -45,7 +45,7 @@ export default function TabsLayout() {
                 tabBarIcon: ({ color, size }) => (
                 <Ionicons name="nutrition" size={size} color={color} />
                 ),
-                headerTitle: 'Plan Nutricional',
+                headerShown: false,
             }}
         />
         <Tabs.Screen
@@ -55,7 +55,7 @@ export default function TabsLayout() {
                 tabBarIcon: ({ color, size }) => (
                 <FontAwesome5 name="dumbbell" size={size} color={color} />
             ),
-            headerTitle: 'Entrenamiento',
+            headerShown: false,
             }}
         />
         <Tabs.Screen
@@ -65,7 +65,7 @@ export default function TabsLayout() {
                 tabBarIcon: ({ color, size }) => (
                 <Ionicons name="person" size={size} color={color} />
             ),
-            headerTitle: 'Mi Perfil',
+            headerShown: false,
             }}
         />
     </Tabs>

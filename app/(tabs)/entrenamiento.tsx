@@ -1,176 +1,114 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
+import WeeklyStrip from '../../src/components/training/WeeklyStrip';
+import TopMiniNav, { TopMiniTab } from '../../src/components/training/TopMiniNav';
+import SearchPane from '../training/search';
+import SavedPane from '../training/saved';
+import { COLORS, RADII } from '../../src/styles/tokens';
 
-interface WorkoutType {
-  id: string;
-  name: string;
-  icon: keyof typeof Ionicons.glyphMap;
-}
-
-const WORKOUT_TYPES: WorkoutType[] = [
-  { id: '1', name: 'Fuerza', icon: 'barbell' },
-  { id: '2', name: 'Cardio', icon: 'fitness' },
-  { id: '3', name: 'Flexibilidad', icon: 'body' },
-  { id: '4', name: 'HIIT', icon: 'timer' },
-];
-
-interface WorkoutPlan {
-  id: string;
-  title: string;
-  duration: string;
-  level: string;
-  description: string;
-}
-
-const WORKOUT_PLANS: WorkoutPlan[] = [
-  {
-    id: '1',
-    title: 'Full Body Workout',
-    duration: '45 min',
-    level: 'Intermedio',
-    description: 'Entrenamiento completo para todo el cuerpo enfocado en los principales grupos musculares.',
-  },
-  {
-    id: '2',
-    title: 'Core & Abs',
-    duration: '30 min',
-    level: 'Principiante',
-    description: 'Rutina especializada para fortalecer el core y los abdominales.',
-  },
-  {
-    id: '3',
-    title: 'Upper Body Power',
-    duration: '40 min',
-    level: 'Avanzado',
-    description: 'Entrenamiento intenso para desarrollar fuerza en la parte superior del cuerpo.',
-  },
+const FEATURED = [
+  { id: 'p1', title: 'Programa para front lever' },
+  { id: 'p2', title: 'Programa de handstand (vertical)' },
+  { id: 'p3', title: 'Ganar masa muscular' },
+  { id: 'p4', title: 'Perder grasa / recomposición' },
 ];
 
 export default function EntrenamientoScreen() {
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tipos de Entrenamiento</Text>
-          <View style={styles.workoutTypesContainer}>
-            {WORKOUT_TYPES.map((type) => (
-              <TouchableOpacity key={type.id} style={styles.workoutTypeCard}>
-                <Ionicons name={type.icon} size={32} color="#2C6ECB" />
-                <Text style={styles.workoutTypeName}>{type.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+  const router = useRouter();
+  const [topTab, setTopTab] = useState<TopMiniTab>('overview');
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Mis Rutinas</Text>
-          {WORKOUT_PLANS.map((plan) => (
-            <TouchableOpacity key={plan.id} style={styles.planCard}>
-              <View style={styles.planHeader}>
-                <Text style={styles.planTitle}>{plan.title}</Text>
-                <View style={styles.planDetails}>
-                  <Text style={styles.planDetailText}>{plan.duration}</Text>
-                  <Text style={styles.planDetailText}>•</Text>
-                  <Text style={styles.planDetailText}>{plan.level}</Text>
+  const goToCalendar = () => router.push('/entrenamiento/calendar');
+
+  return (
+    <View style={styles.root}>
+      <SafeAreaView edges={['top']} style={styles.safeTop}>
+        {/* Mini navbar superior */}
+        <TopMiniNav active={topTab} onChange={setTopTab} />
+
+        {topTab === 'overview' ? (
+          <>
+            {/* Bloque negro clickeable */}
+            <TouchableOpacity activeOpacity={0.9} onPress={goToCalendar} style={styles.topPanel}>
+              <Text style={styles.weekTitle}>ESTA SEMANA</Text>
+              <WeeklyStrip />
+              <View style={styles.todayCard}>
+                <Text style={styles.todayLabel}>Entrenamiento de hoy</Text>
+                <View style={styles.emptySlot}>
+                  <Text style={styles.emptySlotText}>Nada programado</Text>
                 </View>
               </View>
-              <Text style={styles.planDescription}>{plan.description}</Text>
-              <TouchableOpacity style={styles.startButton}>
-                <Text style={styles.startButtonText}>Empezar</Text>
-              </TouchableOpacity>
             </TouchableOpacity>
-          ))}
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+
+            {/* Panel blanco */}
+            <View style={styles.panel}>
+              <Text style={styles.sectionTitle}>Programas destacados</Text>
+              <FlatList
+                data={FEATURED}
+                keyExtractor={(i) => i.id}
+                contentContainerStyle={{ paddingBottom: 32 }}
+                renderItem={({ item }) => (
+                  <TouchableOpacity activeOpacity={0.85} style={styles.programCard} onPress={() => {}}>
+                    <Text style={styles.programTitle}>{item.title}</Text>
+                  </TouchableOpacity>
+                )}
+                ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+                showsVerticalScrollIndicator={false}
+              />
+            </View>
+          </>
+        ) : (
+          // Search / Saved dentro del mismo panel blanco
+          <View style={styles.panel}>
+            {topTab === 'search' ? <SearchPane /> : <SavedPane />}
+          </View>
+        )}
+      </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: { flex: 1, backgroundColor: COLORS.black },
+  safeTop: { flex: 1, backgroundColor: COLORS.black },
+
+  /** Mini nav deja aire debajo */
+  // (si tu TopMiniNav ya le da marginBottom, podés quitarlo de allí)
+  // wrapeado por SafeArea: no tapa al panel blanco
+  topPanel: {
+    backgroundColor: COLORS.black,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    paddingTop: 10,
+    borderBottomLeftRadius: RADII.panel,
+    borderBottomRightRadius: RADII.panel,
+  },
+  weekTitle: { color: COLORS.white, fontWeight: '700', letterSpacing: 0.2, marginBottom: 6 },
+  todayCard: { marginTop: 10 },
+  todayLabel: { color: COLORS.white, fontWeight: '600', marginBottom: 6 },
+  emptySlot: { backgroundColor: '#2a2a2a', borderRadius: RADII.card, paddingVertical: 12, paddingHorizontal: 14 },
+  emptySlotText: { color: '#d1d1d1', fontWeight: '500' },
+
+  /** Panel blanco reutilizable */
+  panel: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: RADII.panel,
+    borderTopRightRadius: RADII.panel,
+    paddingTop: 16,
+    paddingHorizontal: 20,
+    overflow: 'hidden', // evita “medias lunas” visuales al recortar hijos
   },
-  section: {
-    padding: 16,
-    marginBottom: 8,
+
+  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.black, marginBottom: 12 },
+  programCard: {
+    backgroundColor: COLORS.gray100,
+    borderRadius: RADII.card,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    borderColor: COLORS.gray300,
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#333333',
-  },
-  workoutTypesContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-  },
-  workoutTypeCard: {
-    width: '48%',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  workoutTypeName: {
-    marginTop: 8,
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333333',
-  },
-  planCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  planHeader: {
-    marginBottom: 8,
-  },
-  planTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333333',
-    marginBottom: 4,
-  },
-  planDetails: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  planDetailText: {
-    fontSize: 14,
-    color: '#666666',
-    marginRight: 8,
-  },
-  planDescription: {
-    fontSize: 14,
-    color: '#333333',
-    marginBottom: 16,
-    lineHeight: 20,
-  },
-  startButton: {
-    backgroundColor: '#2C6ECB',
-    borderRadius: 8,
-    paddingVertical: 10,
-    alignItems: 'center',
-  },
-  startButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '600',
-    fontSize: 16,
-  },
+  programTitle: { color: COLORS.black, fontSize: 15, fontWeight: '600' },
 });

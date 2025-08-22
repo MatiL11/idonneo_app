@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import type { Article } from '../types/article';
+import type { Article } from '../types/index';
 
 export async function fetchAllArticles(): Promise<Article[]> {
   const { data, error } = await supabase
