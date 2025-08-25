@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,9 @@ import TopMiniNav, { TopMiniTab } from '../../src/components/training/TopMiniNav
 import SearchPane from '../training/search';
 import SavedPane from '../training/saved';
 import { COLORS, RADII } from '../../src/styles/tokens';
+import dayjs from 'dayjs';
+import { supabase } from '../../src/lib/supabase';
+import { useAuthStore } from '../../src/lib/store';
 
 const FEATURED = [
   { id: 'p1', title: 'Programa para front lever' },
@@ -19,6 +22,93 @@ const FEATURED = [
 export default function EntrenamientoScreen() {
   const router = useRouter();
   const [topTab, setTopTab] = useState<TopMiniTab>('overview');
+
+  const session = useAuthStore((s) => s.session);
+  const userId = session?.user?.id ?? null;
+
+  const todayIso = dayjs().format('YYYY-MM-DD');
+
+  const [todayLabel, setTodayLabel] = useState<string>('Nada programado');
+  const [loadingToday, setLoadingToday] = useState<boolean>(false);
+
+  // --- Cargar "entrenamiento de hoy" desde Supabase ---
+  useEffect(() => {
+    if (!userId) return;
+
+    let mounted = true;
+    (async () => {
+      try {
+        setLoadingToday(true);
+
+        // 1) Plan activo del usuario que incluya HOY
+        const { data: plans, error: planErr } = await supabase
+          .from('training_plans')
+          .select('id, start_date, end_date')
+          .eq('user_id', userId)
+          .lte('start_date', todayIso)
+          .gte('end_date', todayIso)
+          .order('start_date', { ascending: false })
+          .limit(1);
+
+        if (planErr) throw planErr;
+        const plan = plans?.[0];
+        if (!plan) {
+          if (mounted) setTodayLabel('Sin plan activo');
+          return;
+        }
+
+        // 2) Override del usuario para hoy (pisa todo)
+        const { data: ovs, error: ovErr } = await supabase
+          .from('training_overrides')
+          .select('date, is_rest, routine_id, routines ( title )')
+          .eq('user_id', userId)
+          .eq('date', todayIso)
+          .limit(1);
+
+        if (ovErr) throw ovErr;
+
+        if (ovs && ovs[0]) {
+          const ov = ovs[0];
+          if (ov.is_rest) {
+            if (mounted) setTodayLabel('Descanso');
+            return;
+          }
+          if (ov.routines && Array.isArray(ov.routines) && ov.routines[0]?.title) {
+            if (mounted) setTodayLabel(ov.routines[0].title);
+            return;
+          }
+          // si hay override sin rutina/is_rest, continuamos al plan_day
+        }
+
+        // 3) Día del plan de hoy (con join a routines)
+        const { data: days, error: dayErr } = await supabase
+          .from('training_plan_days')
+          .select('id, date, title, routine_id, routines ( title )')
+          .eq('plan_id', plan.id)
+          .eq('date', todayIso)
+          .limit(1);
+
+        if (dayErr) throw dayErr;
+
+        const day = days?.[0];
+        const label =
+          day?.title ??
+          (Array.isArray(day?.routines) && day?.routines[0]?.title) ??
+          (day ? 'Sesión' : 'Nada programado');
+
+        if (mounted) setTodayLabel(label);
+      } catch (e) {
+        console.error('[today] error:', e);
+        if (mounted) setTodayLabel('Error al cargar');
+      } finally {
+        if (mounted) setLoadingToday(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+    };
+  }, [userId, todayIso]);
 
   const goToCalendar = () => router.push('/training/calendar');
 
@@ -48,7 +138,11 @@ export default function EntrenamientoScreen() {
               <View style={styles.todayCard}>
                 <Text style={styles.todayLabel}>Entrenamiento de hoy</Text>
                 <View style={styles.emptySlot}>
-                  <Text style={styles.emptySlotText}>Nada programado</Text>
+                  {loadingToday ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text style={styles.emptySlotText}>{todayLabel}</Text>
+                  )}
                 </View>
               </View>
             </TouchableOpacity>
@@ -110,6 +204,9 @@ const styles = StyleSheet.create({
     borderRadius: RADII.card,
     paddingVertical: 12,
     paddingHorizontal: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 44,
   },
   emptySlotText: { color: '#d1d1d1', fontWeight: '500' },
 
