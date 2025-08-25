@@ -203,5 +203,33 @@ export function useExercises(userId?: string) {
     [uploadToStorage, userId]
   );
 
-  return { list, loading, saving, error, load, add, pickImage };
+  const remove = useCallback(
+    async (exerciseId: string) => {
+      if (!userId) throw new Error("No hay usuario");
+      try {
+        setLoading(true);
+        
+        // Eliminamos el ejercicio de la base de datos
+        const { error } = await supabase
+          .from("exercises")
+          .delete()
+          .eq("id", exerciseId)
+          .eq("user_id", userId); // Verificación adicional de seguridad
+        
+        if (error) throw error;
+        
+        // Actualizamos la lista local
+        setList(prev => prev.filter(ex => ex.id !== exerciseId));
+        return true;
+      } catch (err) {
+        console.error("Error al eliminar el ejercicio:", err);
+        throw err;
+      } finally {
+        setLoading(false);
+      }
+    },
+    [userId]
+  );
+
+  return { list, loading, saving, error, load, add, remove, pickImage };
 }

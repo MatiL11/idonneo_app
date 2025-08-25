@@ -8,24 +8,48 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
+  Alert,
 } from 'react-native';
 import { Ionicons, Entypo } from '@expo/vector-icons';
 import { COLORS } from '../../src/styles/tokens';
 import { useExercises, Exercise } from '../../src/hooks/useExercises';
+import { useRoutines, Routine } from '../../src/hooks/useRoutines';
 import { useAuthStore } from '../../src/lib/store';
 import AddExerciseModal from '../../src/components/training/AddExerciseModal';
+import AddRoutineModal from '../../src/components/training/AddRoutineModal';
+import RoutineOptionsMenu from '../../src/components/training/RoutineOptionsMenu';
+import ExerciseOptionsMenu from '../../src/components/training/ExerciseOptionsMenu';
 
 const RADIUS = { segment: 18, card: 12 };
 type SavedTab = 'exercises' | 'routines' | 'programs';
 
+// Datos de ejemplo que se mostrarán solo cuando no haya rutinas guardadas
+// Rutinas de ejemplo que tienen la misma estructura que nuestras Routine
 const FEATURED_ROUTINES = [
-  { id: 'r1', name: 'Nombre de la rutina', desc: 'músculos que trabaja esta rutina' },
-  { id: 'r2', name: 'Push/Pull/Legs (3 días)', desc: 'Pectoral – Espalda – Piernas' },
-];
+  { 
+    id: 'r1', 
+    user_id: 'featured', 
+    title: 'Nombre de la rutina', 
+    description: 'músculos que trabaja esta rutina',
+    created_at: new Date().toISOString() 
+  },
+  { 
+    id: 'r2', 
+    user_id: 'featured', 
+    title: 'Push/Pull/Legs (3 días)', 
+    description: 'Pectoral – Espalda – Piernas',
+    created_at: new Date().toISOString() 
+  },
+] as Routine[];
 
 export default function SavedPane() {
   const [tab, setTab] = useState<SavedTab>('exercises');
-  const [showAdd, setShowAdd] = useState(false);
+  const [showAddExercise, setShowAddExercise] = useState(false);
+  const [showAddRoutine, setShowAddRoutine] = useState(false);
+  const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
+  const [showRoutineOptions, setShowRoutineOptions] = useState(false);
+  const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
+  const [showExerciseOptions, setShowExerciseOptions] = useState(false);
   const session = useAuthStore((s) => s.session);
   const userId = session?.user?.id;
   
@@ -46,11 +70,23 @@ export default function SavedPane() {
     () => ex?.list || [],
     [ex?.list]
   );
-  const isLoading = ex?.loading;
+  const isLoadingExercises = ex?.loading;
   const addExercise = ex?.add;
-  const refresh = ex?.load;
+  const removeExercise = ex?.remove;
+  const refreshExercises = ex?.load;
+  
+  // Hook de rutinas
+  const rt = useRoutines(userId as string);
+  const routines = useMemo(
+    () => rt?.list || [],
+    [rt?.list]
+  );
+  const isLoadingRoutines = rt?.loading;
+  const addRoutine = rt?.add;
+  const removeRoutine = rt?.remove;
+  const refreshRoutines = rt?.load;
 
-  const onSubmitNew = async (payload: { name: string; imageUri?: string | null }) => {
+  const onSubmitNewExercise = async (payload: { name: string; imageUri?: string | null }) => {
     if (!addExercise) {
       console.error("La función addExercise no está disponible");
       return;
@@ -63,11 +99,70 @@ export default function SavedPane() {
     console.log("Payload:", payload);
     try {
       await addExercise(payload);
-      setShowAdd(false);
-      await refresh();
+      setShowAddExercise(false);
+      await refreshExercises();
       console.log("Ejercicio añadido correctamente");
     } catch (error) {
       console.error("Error al añadir ejercicio:", error);
+    }
+  };
+  
+  const onSubmitNewRoutine = async (payload: { title: string; description?: string }) => {
+    if (!addRoutine) {
+      console.error("La función addRoutine no está disponible");
+      return;
+    }
+    if (!userId) {
+      console.error("No hay userId disponible. El usuario debe estar autenticado para añadir rutinas.");
+      return;
+    }
+    console.log("Intentando añadir rutina para usuario:", userId);
+    console.log("Payload:", payload);
+    try {
+      await addRoutine(payload);
+      setShowAddRoutine(false);
+      await refreshRoutines();
+      console.log("Rutina añadida correctamente");
+    } catch (error) {
+      console.error("Error al añadir rutina:", error);
+    }
+  };
+  
+  const handleDeleteRoutine = async () => {
+    if (!selectedRoutine || !removeRoutine) return;
+    
+    try {
+      console.log("Eliminando rutina:", selectedRoutine.id);
+      await removeRoutine(selectedRoutine.id);
+      await refreshRoutines();
+      console.log("Rutina eliminada correctamente");
+    } catch (error) {
+      console.error("Error al eliminar rutina:", error);
+      Alert.alert("Error", "No se pudo eliminar la rutina. Por favor, intenta de nuevo.");
+    }
+  };
+  
+  const handleOpenRoutineOptions = (routine: Routine) => {
+    setSelectedRoutine(routine);
+    setShowRoutineOptions(true);
+  };
+  
+  const handleOpenExerciseOptions = (exercise: Exercise) => {
+    setSelectedExercise(exercise);
+    setShowExerciseOptions(true);
+  };
+  
+  const handleDeleteExercise = async () => {
+    if (!selectedExercise || !removeExercise) return;
+    
+    try {
+      console.log("Eliminando ejercicio:", selectedExercise.id);
+      await removeExercise(selectedExercise.id);
+      await refreshExercises();
+      console.log("Ejercicio eliminado correctamente");
+    } catch (error) {
+      console.error("Error al eliminar ejercicio:", error);
+      Alert.alert("Error", "No se pudo eliminar el ejercicio. Por favor, intenta de nuevo.");
     }
   };
 
@@ -111,7 +206,12 @@ export default function SavedPane() {
           </Text>
         </View>
         
-        <Entypo name="dots-three-horizontal" size={16} color={COLORS.gray500} />
+        <TouchableOpacity 
+          onPress={() => handleOpenExerciseOptions(item)}
+          hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+        >
+          <Entypo name="dots-three-horizontal" size={16} color={COLORS.gray500} />
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
@@ -126,7 +226,7 @@ export default function SavedPane() {
       </View>
 
       {tab === 'exercises' ? (
-        isLoading && exercises.length === 0 ? (
+        isLoadingExercises && exercises.length === 0 ? (
           <View style={styles.loaderBox}>
             <ActivityIndicator color={COLORS.black} />
             <Text style={{ color: COLORS.black, marginTop: 10 }}>Cargando…</Text>
@@ -140,7 +240,7 @@ export default function SavedPane() {
             contentContainerStyle={{ paddingVertical: 8, paddingBottom: 90 }}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={isLoading} onRefresh={refresh} colors={[COLORS.black]} tintColor={COLORS.black} />
+              <RefreshControl refreshing={isLoadingExercises} onRefresh={refreshExercises} colors={[COLORS.black]} tintColor={COLORS.black} />
             }
             ListEmptyComponent={
               <View style={styles.placeholderBox}>
@@ -150,45 +250,106 @@ export default function SavedPane() {
           />
         )
       ) : tab === 'routines' ? (
-        <FlatList
-          data={FEATURED_ROUTINES}
-          keyExtractor={(i) => i.id}
-          contentContainerStyle={{ paddingVertical: 8, paddingBottom: 80 }}
-          ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-          showsVerticalScrollIndicator={false}
-          renderItem={({ item }) => (
-            <TouchableOpacity activeOpacity={0.9} style={styles.routineCard} onPress={() => {}}>
-              <View style={styles.routineCardHeader}>
-                <Text numberOfLines={1} style={styles.routineTitle}>{item.name}</Text>
-                <Entypo name="dots-three-horizontal" size={16} color="#fff" />
+        isLoadingRoutines && routines.length === 0 ? (
+          <View style={styles.loaderBox}>
+            <ActivityIndicator color={COLORS.black} />
+            <Text style={{ color: COLORS.black, marginTop: 10 }}>Cargando…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={routines.length > 0 ? routines : FEATURED_ROUTINES}
+            keyExtractor={(i) => i.id}
+            contentContainerStyle={{ paddingVertical: 8, paddingBottom: 80 }}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isLoadingRoutines} onRefresh={refreshRoutines} colors={[COLORS.black]} tintColor={COLORS.black} />
+            }
+            renderItem={({ item }) => {
+              const isFeatureItem = item.user_id === 'featured';
+              
+              return (
+                <TouchableOpacity activeOpacity={0.9} style={styles.routineCard} onPress={() => {}}>
+                  <View style={styles.routineCardHeader}>
+                    <Text numberOfLines={1} style={styles.routineTitle}>{item.title}</Text>
+                    <TouchableOpacity 
+                      onPress={() => handleOpenRoutineOptions(item)}
+                      hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                    >
+                      <Entypo name="dots-three-horizontal" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text numberOfLines={1} style={styles.routineDesc}>
+                    {item.description || 'Sin descripción'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.placeholderBox}>
+                <Text style={{ color: '#777' }}>Aún no agregaste rutinas</Text>
               </View>
-              <Text numberOfLines={1} style={styles.routineDesc}>{item.desc}</Text>
-            </TouchableOpacity>
-          )}
-        />
+            }
+          />
+        )
       ) : (
         <View style={styles.placeholderBox}>
           <Text style={{ color: '#777' }}>Programas guardados</Text>
         </View>
       )}
 
-      {/* FAB solo activo en Ejercicios */}
+      {/* FAB para añadir (ejercicio o rutina según tab) */}
       <TouchableOpacity
-        style={[styles.fab, tab !== 'exercises' && { opacity: 0.4 }]}
+        style={styles.fab}
         activeOpacity={0.9}
-        onPress={() => tab === 'exercises' && setShowAdd(true)}
+        onPress={() => {
+          if (tab === 'exercises') {
+            setShowAddExercise(true);
+          } else if (tab === 'routines') {
+            setShowAddRoutine(true);
+          }
+        }}
       >
         <Ionicons name="add" size={26} color="#fff" />
       </TouchableOpacity>
 
       {/* Modal para crear ejercicio */}
       <AddExerciseModal
-        visible={showAdd}
-        onClose={() => setShowAdd(false)}
-        onSubmit={onSubmitNew}
+        visible={showAddExercise}
+        onClose={() => setShowAddExercise(false)}
+        onSubmit={onSubmitNewExercise}
         onPickImage={ex?.pickImage || (async () => null)}
         saving={ex?.saving}
       />
+      
+      {/* Modal para crear rutina */}
+      <AddRoutineModal
+        visible={showAddRoutine}
+        onClose={() => setShowAddRoutine(false)}
+        onSubmit={onSubmitNewRoutine}
+        saving={rt?.saving}
+      />
+      
+      {/* Menú de opciones de rutina */}
+      {selectedRoutine && (
+        <RoutineOptionsMenu
+          visible={showRoutineOptions}
+          onClose={() => setShowRoutineOptions(false)}
+          onDelete={handleDeleteRoutine}
+          routineName={selectedRoutine.title}
+          isFeatureItem={selectedRoutine.user_id === 'featured'}
+        />
+      )}
+      
+      {/* Menú de opciones de ejercicio */}
+      {selectedExercise && (
+        <ExerciseOptionsMenu
+          visible={showExerciseOptions}
+          onClose={() => setShowExerciseOptions(false)}
+          onDelete={handleDeleteExercise}
+          exerciseName={selectedExercise.name}
+        />
+      )}
     </View>
   );
 }
