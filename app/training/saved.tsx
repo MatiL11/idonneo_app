@@ -11,6 +11,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons, Entypo } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { COLORS } from '../../src/styles/tokens';
 import { useExercises, Exercise } from '../../src/hooks/useExercises';
 import { useRoutines, Routine } from '../../src/hooks/useRoutines';
@@ -43,6 +44,7 @@ const FEATURED_ROUTINES = [
 ] as Routine[];
 
 export default function SavedPane() {
+  const router = useRouter();
   const [tab, setTab] = useState<SavedTab>('exercises');
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [showAddRoutine, setShowAddRoutine] = useState(false);
@@ -145,6 +147,15 @@ export default function SavedPane() {
   const handleOpenRoutineOptions = (routine: Routine) => {
     setSelectedRoutine(routine);
     setShowRoutineOptions(true);
+  };
+
+  const handleOpenRoutine = (routine: Routine) => {
+    // Solo navegamos a rutinas del usuario, no a las destacadas
+    if (routine.user_id === 'featured') {
+      Alert.alert('Rutina destacada', 'Esta es una rutina de ejemplo. Crea tu propia rutina para personalizarla.');
+      return;
+    }
+    router.push(`/training/routine/${routine.id}`);
   };
   
   const handleOpenExerciseOptions = (exercise: Exercise) => {
@@ -269,7 +280,11 @@ export default function SavedPane() {
               const isFeatureItem = item.user_id === 'featured';
               
               return (
-                <TouchableOpacity activeOpacity={0.9} style={styles.routineCard} onPress={() => {}}>
+                <TouchableOpacity 
+                  activeOpacity={0.9} 
+                  style={styles.routineCard} 
+                  onPress={() => handleOpenRoutine(item)}
+                >
                   <View style={styles.routineCardHeader}>
                     <Text numberOfLines={1} style={styles.routineTitle}>{item.title}</Text>
                     <TouchableOpacity 
