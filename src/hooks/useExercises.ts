@@ -10,6 +10,7 @@ export type Exercise = {
   name: string;
   image_url?: string | null;
   created_at: string;
+  is_public: boolean;
 };
 
 type AddPayload = { name: string; imageUri?: string | null };
