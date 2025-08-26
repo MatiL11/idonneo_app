@@ -16,13 +16,32 @@ import { COLORS } from '../../src/styles/tokens';
 import { useExercises, Exercise } from '../../src/hooks/useExercises';
 import { useRoutines, Routine } from '../../src/hooks/useRoutines';
 import { useAuthStore } from '../../src/lib/store';
+import { supabase } from '../../src/lib/supabase';
 import AddExerciseModal from '../../src/components/training/AddExerciseModal';
 import AddRoutineModal from '../../src/components/training/AddRoutineModal';
+import AddProgramModal from '../../src/components/training/AddProgramModal';
 import RoutineOptionsMenu from '../../src/components/training/RoutineOptionsMenu';
+import ProgramOptionsMenu from '../../src/components/training/ProgramOptionsMenu';
 import ExerciseOptionsMenu from '../../src/components/training/ExerciseOptionsMenu';
 
 const RADIUS = { segment: 18, card: 12 };
 type SavedTab = 'exercises' | 'routines' | 'programs';
+
+// Definir la estructura de un programa
+interface Program {
+  id: string;
+  title: string;
+  description?: string | null;
+  created_at: string;
+  user_id: string;
+}
+
+// Definir la estructura de una plantilla de semana de programa
+interface ProgramWeekTemplate {
+  program_id: string;
+  weekday: number;
+  routine_id: string;
+}
 
 // Datos de ejemplo que se mostrarán solo cuando no haya rutinas guardadas
 // Rutinas de ejemplo que tienen la misma estructura que nuestras Routine
@@ -48,10 +67,16 @@ export default function SavedPane() {
   const [tab, setTab] = useState<SavedTab>('exercises');
   const [showAddExercise, setShowAddExercise] = useState(false);
   const [showAddRoutine, setShowAddRoutine] = useState(false);
+  const [showAddProgram, setShowAddProgram] = useState(false);
   const [selectedRoutine, setSelectedRoutine] = useState<Routine | null>(null);
   const [showRoutineOptions, setShowRoutineOptions] = useState(false);
   const [selectedExercise, setSelectedExercise] = useState<Exercise | null>(null);
   const [showExerciseOptions, setShowExerciseOptions] = useState(false);
+  const [savingProgram, setSavingProgram] = useState(false);
+  const [programs, setPrograms] = useState<Program[]>([]);
+  const [isLoadingPrograms, setIsLoadingPrograms] = useState(false);
+  const [selectedProgram, setSelectedProgram] = useState<Program | null>(null);
+  const [showProgramOptions, setShowProgramOptions] = useState(false);
   const session = useAuthStore((s) => s.session);
   const userId = session?.user?.id;
   
@@ -65,6 +90,42 @@ export default function SavedPane() {
       console.warn('No hay sesión activa. El usuario debe iniciar sesión para guardar ejercicios.');
     }
   }, [session, userId]);
+  
+  // Controlamos la carga inicial de programas
+  const [programsInitialLoaded, setProgramsInitialLoaded] = useState(false);
+  
+  // Cargar programas del usuario solo la primera vez que se selecciona la pestaña
+  useEffect(() => {
+    if (tab === 'programs' && userId && !programsInitialLoaded) {
+      fetchPrograms();
+      setProgramsInitialLoaded(true);
+    }
+  }, [tab, userId, programsInitialLoaded]);
+  
+  const fetchPrograms = async () => {
+    if (!userId) return;
+    
+    console.log('Fetching programs for user ID:', userId);
+    setIsLoadingPrograms(true);
+    try {
+      // Obtenemos los programas directamente de la tabla programs
+      const { data: programsData, error: programsError } = await supabase
+        .from('programs')
+        .select('id, user_id, title, description, created_at')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      console.log('Programs query result:', programsData, programsError);
+      if (programsError) throw programsError;
+      
+      setPrograms(programsData || []);
+    } catch (error) {
+      console.error('Error fetching programs:', error);
+      Alert.alert('Error', 'No se pudieron cargar los programas');
+    } finally {
+      setIsLoadingPrograms(false);
+    }
+  };
 
   // Hook de ejercicios
   const ex = useExercises(userId as string);
@@ -157,6 +218,38 @@ export default function SavedPane() {
     }
     router.push(`/training/routine/${routine.id}`);
   };
+
+  // Función para eliminar un programa
+  const handleDeleteProgram = async () => {
+    if (!selectedProgram) return;
+    
+    try {
+      // Primero eliminamos las plantillas de semana del programa
+      const { error: templateError } = await supabase
+        .from('program_week_template')
+        .delete()
+        .eq('program_id', selectedProgram.id);
+      
+      if (templateError) throw templateError;
+      
+      // Luego eliminamos el programa
+      const { error: programError } = await supabase
+        .from('programs')
+        .delete()
+        .eq('id', selectedProgram.id);
+      
+      if (programError) throw programError;
+      
+      // Actualizamos la lista de programas
+      setPrograms(programs.filter(p => p.id !== selectedProgram.id));
+      Alert.alert('Éxito', 'Programa eliminado correctamente');
+    } catch (error) {
+      console.error("Error al eliminar programa:", error);
+      Alert.alert("Error", "No se pudo eliminar el programa. Por favor, intenta de nuevo.");
+    } finally {
+      setSelectedProgram(null);
+    }
+  };
   
   const handleOpenExerciseOptions = (exercise: Exercise) => {
     setSelectedExercise(exercise);
@@ -174,6 +267,67 @@ export default function SavedPane() {
     } catch (error) {
       console.error("Error al eliminar ejercicio:", error);
       Alert.alert("Error", "No se pudo eliminar el ejercicio. Por favor, intenta de nuevo.");
+    }
+  };
+  
+  const onSubmitNewProgram = async (payload: {
+    title: string;
+    description?: string;
+    days: Array<{
+      weekday: number;
+      routine_id: string | null;
+      is_rest: boolean;
+    }>;
+  }) => {
+    if (!userId) {
+      console.error("No hay userId disponible. El usuario debe estar autenticado para añadir programas.");
+      return;
+    }
+    
+    console.log("Intentando añadir programa para usuario:", userId);
+    console.log("Payload:", payload);
+    
+    try {
+      setSavingProgram(true);
+      
+      // 1. Crear el programa
+      const { data: programData, error: programError } = await supabase
+        .from('programs')
+        .insert({
+          user_id: userId,
+          title: payload.title,
+          description: payload.description || ''
+        })
+        .select('id')
+        .single();
+      
+      if (programError) throw programError;
+      
+      // 2. Crear las plantillas de semana para el programa
+      const weekTemplates = payload.days
+        .filter(day => !day.is_rest && day.routine_id) // Solo los días que tienen rutina asignada
+        .map(day => ({
+          program_id: programData.id,
+          weekday: day.weekday,
+          routine_id: day.routine_id as string
+        }));
+      
+      if (weekTemplates.length > 0) {
+        const { error: templatesError } = await supabase
+          .from('program_week_template')
+          .insert(weekTemplates);
+        
+        if (templatesError) throw templatesError;
+      }
+      
+      Alert.alert('Éxito', 'Programa creado correctamente');
+      setShowAddProgram(false);
+      fetchPrograms();
+    } catch (error) {
+      console.error('Error saving program:', error);
+      Alert.alert('Error', 'No se pudo guardar el programa');
+    } finally {
+      setSavingProgram(false);
     }
   };
 
@@ -307,13 +461,58 @@ export default function SavedPane() {
             }
           />
         )
-      ) : (
-        <View style={styles.placeholderBox}>
-          <Text style={{ color: '#777' }}>Programas guardados</Text>
-        </View>
-      )}
+      ) : tab === 'programs' ? (
+        isLoadingPrograms && programs.length === 0 ? (
+          <View style={styles.loaderBox}>
+            <ActivityIndicator color={COLORS.black} />
+            <Text style={{ color: COLORS.black, marginTop: 10 }}>Cargando…</Text>
+          </View>
+        ) : (
+          <FlatList
+            data={programs}
+            keyExtractor={(item: Program) => item.id}
+            contentContainerStyle={{ paddingVertical: 8, paddingBottom: 80 }}
+            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl refreshing={isLoadingPrograms} onRefresh={fetchPrograms} colors={[COLORS.black]} tintColor={COLORS.black} />
+            }
+            renderItem={({ item }: { item: Program }) => {
+              console.log('Rendering program item:', item);
+              return (
+                <TouchableOpacity 
+                  activeOpacity={0.9} 
+                  style={[styles.routineCard, { backgroundColor: COLORS.black }]} // Cambiado a negro según requerimiento
+                  onPress={() => router.push(`/training/program/${item.id}`)}
+                >
+                  <View style={styles.routineCardHeader}>
+                    <Text numberOfLines={1} style={styles.routineTitle}>{item.title || 'Programa sin nombre'}</Text>
+                    <TouchableOpacity 
+                      hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                      onPress={() => {
+                        setSelectedProgram(item);
+                        setShowProgramOptions(true);
+                      }}
+                    >
+                      <Entypo name="dots-three-horizontal" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text numberOfLines={1} style={styles.routineDesc}>
+                    {item.description || 'Sin descripción'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }}
+            ListEmptyComponent={
+              <View style={styles.placeholderBox}>
+                <Text style={{ color: '#777' }}>Aún no agregaste programas</Text>
+              </View>
+            }
+          />
+        )
+      ) : null}
 
-      {/* FAB para añadir (ejercicio o rutina según tab) */}
+      {/* FAB para añadir (ejercicio, rutina o programa según tab) */}
       <TouchableOpacity
         style={styles.fab}
         activeOpacity={0.9}
@@ -322,6 +521,8 @@ export default function SavedPane() {
             setShowAddExercise(true);
           } else if (tab === 'routines') {
             setShowAddRoutine(true);
+          } else if (tab === 'programs') {
+            setShowAddProgram(true);
           }
         }}
       >
@@ -345,6 +546,15 @@ export default function SavedPane() {
         saving={rt?.saving}
       />
       
+      {/* Modal para crear programa */}
+      <AddProgramModal
+        visible={showAddProgram}
+        onClose={() => setShowAddProgram(false)}
+        onSubmit={onSubmitNewProgram}
+        routines={routines}
+        saving={savingProgram}
+      />
+      
       {/* Menú de opciones de rutina */}
       {selectedRoutine && (
         <RoutineOptionsMenu
@@ -363,6 +573,16 @@ export default function SavedPane() {
           onClose={() => setShowExerciseOptions(false)}
           onDelete={handleDeleteExercise}
           exerciseName={selectedExercise.name}
+        />
+      )}
+      
+      {/* Menú de opciones de programa */}
+      {selectedProgram && (
+        <ProgramOptionsMenu
+          visible={showProgramOptions}
+          onClose={() => setShowProgramOptions(false)}
+          onDelete={handleDeleteProgram}
+          programName={selectedProgram.title}
         />
       )}
     </View>
