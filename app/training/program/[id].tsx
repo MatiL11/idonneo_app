@@ -169,6 +169,7 @@ export default function ProgramDetailScreen() {
   };
 
   const handleStartTraining = (routineId: string) => {
+    // Al iniciar entrenamiento desde un programa, siempre editamos la rutina
     router.push(`/training/routine/${routineId}`);
   };
 

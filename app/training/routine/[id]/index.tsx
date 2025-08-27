@@ -1,17 +1,23 @@
+// This file is the routine editor page
 import React from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert, StyleSheet } from 'react-native';
 import { useLocalSearchParams, Stack, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-import RoundsPill from '../../../src/components/training/routineBuilder/RoundsPill';
-import BlockCard from '../../../src/components/training/routineBuilder/BlockCard';
-import SelectExerciseModal from '../../../src/components/training/SelectExerciseModal';
+import RoundsPill from '../../../../src/components/training/routineBuilder/RoundsPill';
+import BlockCard from '../../../../src/components/training/routineBuilder/BlockCard';
+import SelectExerciseModal from '../../../../src/components/training/SelectExerciseModal';
+import TimePickerModal from '../../../../src/components/training/TimePickerModal';
 
-import { useRoutineBuilder } from '../../../src/hooks/useRoutineBuilder';
+import { useRoutineBuilder } from '../../../../src/hooks/useRoutineBuilder';
 
-export default function RoutineDetailScreen() {
+export default function RoutineEditScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
+
+  const [targetExerciseIndex, setTargetExerciseIndex] = React.useState<number | null>(null);
+  const [showTimeModal, setShowTimeModal] = React.useState(false);
+  const [targetTimeBlockId, setTargetTimeBlockId] = React.useState<string | null>(null);
 
   const {
     routine,
@@ -21,6 +27,7 @@ export default function RoutineDetailScreen() {
     showExerciseModal,
     setShowExerciseModal,
     setRounds,
+    targetBlockId,
     setTargetBlockId,
 
     // actions
@@ -32,7 +39,10 @@ export default function RoutineDetailScreen() {
     convertToSuperset,
     updateExerciseSets,
     updateExerciseReps,
+    updateExerciseRepsBySet,
+    updateExerciseWeightBySet,
     removeExerciseInBlock,
+    changeExerciseInBlock,
     save,
   } = useRoutineBuilder(id as string);
 
@@ -53,6 +63,11 @@ export default function RoutineDetailScreen() {
       </View>
     );
   }
+
+  const openTimeModal = (blockId: string) => {
+    setTargetTimeBlockId(blockId);
+    setShowTimeModal(true);
+  };
 
   const handleSavePress = async () => {
     try {
@@ -92,7 +107,16 @@ export default function RoutineDetailScreen() {
               onAddExerciseToBlock={openAddExerciseToBlock}
               onChangeExerciseSets={updateExerciseSets}
               onChangeExerciseReps={updateExerciseReps}
+              onChangeExerciseRepsBySet={updateExerciseRepsBySet}
+              onChangeExerciseWeightBySet={updateExerciseWeightBySet}
               onRemoveExercise={removeExerciseInBlock}
+              onChangeExercise={(blockId, index) => {
+                setTargetBlockId(blockId);
+                setShowExerciseModal(true);
+                // Guardar el índice del ejercicio para reemplazarlo
+                setTargetExerciseIndex(index);
+              }}
+              onOpenTimeModal={openTimeModal}
             />
           ))}
           <View style={styles.bottomSpace} />
@@ -115,18 +139,56 @@ export default function RoutineDetailScreen() {
         </View>
       </View>
 
-      <SelectExerciseModal
-        visible={showExerciseModal}
-        onClose={() => setShowExerciseModal(false)}
-        onSelectExercise={(exercise) => {
-          // Usar el id como string (UUID)
-          handleSelectExercise({
-            id: exercise.id,
-            name: exercise.name,
-            image_url: exercise.image_url
-          });
-        }}
-      />
+              <SelectExerciseModal
+          visible={showExerciseModal}
+          onClose={() => {
+            setShowExerciseModal(false);
+            setTargetBlockId(null);
+            setTargetExerciseIndex(null);
+          }}
+          onSelectExercise={(exercise) => {
+            // Usar el id como string (UUID)
+            if (targetExerciseIndex !== null && targetBlockId) {
+              // Cambiar ejercicio existente
+              changeExerciseInBlock(targetBlockId, targetExerciseIndex, {
+                id: exercise.id,
+                name: exercise.name,
+                image_url: exercise.image_url
+              });
+            } else {
+              // Agregar nuevo ejercicio
+              handleSelectExercise({
+                id: exercise.id,
+                name: exercise.name,
+                image_url: exercise.image_url
+              });
+            }
+            setShowExerciseModal(false);
+            setTargetBlockId(null);
+            setTargetExerciseIndex(null);
+          }}
+        />
+
+        <TimePickerModal
+          visible={showTimeModal}
+          onClose={() => {
+            setShowTimeModal(false);
+            setTargetTimeBlockId(null);
+          }}
+          onSelectTime={(seconds) => {
+            if (targetTimeBlockId) {
+              // Calcular la diferencia para actualizar el tiempo
+              const currentBlock = blocks.find(b => b.id === targetTimeBlockId);
+              if (currentBlock) {
+                const delta = seconds - currentBlock.rest_seconds;
+                updateBlockRest(targetTimeBlockId, delta);
+              }
+            }
+            setShowTimeModal(false);
+            setTargetTimeBlockId(null);
+          }}
+          currentTime={targetTimeBlockId ? blocks.find(b => b.id === targetTimeBlockId)?.rest_seconds || 90 : 90}
+        />
     </View>
   );
 }

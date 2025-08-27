@@ -56,6 +56,8 @@ export function useRoutineBuilder(routineId?: string) {
           image_url: exercise.image_url || null,
           reps: 10,
           sets: 3,
+          reps_by_set: Array(3).fill(10),
+          weight_by_set: Array(3).fill(0),
         },
       ],
     };
@@ -69,7 +71,7 @@ export function useRoutineBuilder(routineId?: string) {
           ? {
               ...b,
               type: 'superset',
-              exercises: [...b.exercises, { exercise_id: 'placeholder', name: 'Elegir ejercicio', reps: 10, sets: b.sets }],
+              exercises: [...b.exercises, { exercise_id: 'placeholder', name: 'Elegir ejercicio', reps: 10, sets: b.sets, reps_by_set: Array(b.sets).fill(10), weight_by_set: Array(b.sets).fill(0) }],
             }
           : b
       )
@@ -90,17 +92,32 @@ export function useRoutineBuilder(routineId?: string) {
     setBlocks((prev) =>
       prev.map((b) => {
         if (b.id !== targetBlockId) return b;
-        const hasPlaceholder = b.exercises.some((ex) => ex.exercise_id === 'placeholder');
+        
         const exObj = {
           exercise_id: exercise.id,
           name: exercise.name || 'Ejercicio',
           image_url: exercise.image_url || null,
           reps: 10,
           sets: b.sets,
+          reps_by_set: Array(b.sets).fill(10),
+          weight_by_set: Array(b.sets).fill(0),
         };
+
+        // Para supersets, siempre agregar el ejercicio (reemplazando placeholder si existe)
+        if (b.type === 'superset') {
+          const hasPlaceholder = b.exercises.some((ex) => ex.exercise_id === 'placeholder');
+          return {
+            ...b,
+            exercises: hasPlaceholder 
+              ? b.exercises.map((ex) => (ex.exercise_id === 'placeholder' ? exObj : ex))
+              : [...b.exercises, exObj],
+          };
+        }
+        
+        // Para bloques single, reemplazar el ejercicio existente
         return {
           ...b,
-          exercises: hasPlaceholder ? b.exercises.map((ex) => (ex.exercise_id === 'placeholder' ? exObj : ex)) : [...b.exercises, exObj],
+          exercises: [exObj],
         };
       })
     );
@@ -108,8 +125,52 @@ export function useRoutineBuilder(routineId?: string) {
     setShowExerciseModal(false);
   };
 
-  const updateBlockSets = (id: string, delta: number) =>
-    setBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, sets: Math.max(1, b.sets + delta) } : b)));
+  const updateBlockSets = (id: string, delta: number) => {
+    console.log(`updateBlockSets: blockId=${id}, delta=${delta}`);
+    setBlocks((prev) => prev.map((b) => {
+      if (b.id !== id) return b;
+      const newSets = Math.max(1, b.sets + delta);
+      console.log(`Actualizando bloque ${id}: sets ${b.sets} -> ${newSets}`);
+      return {
+        ...b,
+        sets: newSets,
+        exercises: b.exercises.map(ex => {
+          // Preservar arrays existentes y ajustar su longitud
+          let newRepsBySet = ex.reps_by_set;
+          let newWeightBySet = ex.weight_by_set;
+          
+          if (newRepsBySet && newRepsBySet.length !== newSets) {
+            if (newSets > newRepsBySet.length) {
+              // Agregar series faltantes con el último valor o valor base
+              const lastValue = newRepsBySet[newRepsBySet.length - 1] || ex.reps;
+              newRepsBySet = [...newRepsBySet, ...Array(newSets - newRepsBySet.length).fill(lastValue)];
+            } else {
+              // Reducir series, manteniendo las primeras
+              newRepsBySet = newRepsBySet.slice(0, newSets);
+            }
+          }
+          
+          if (newWeightBySet && newWeightBySet.length !== newSets) {
+            if (newSets > newWeightBySet.length) {
+              // Agregar series faltantes con el último valor o valor base
+              const lastValue = newWeightBySet[newWeightBySet.length - 1] || 0;
+              newWeightBySet = [...newWeightBySet, ...Array(newSets - newWeightBySet.length).fill(lastValue)];
+            } else {
+              // Reducir series, manteniendo las primeras
+              newWeightBySet = newWeightBySet.slice(0, newSets);
+            }
+          }
+          
+          return {
+            ...ex,
+            sets: newSets,
+            reps_by_set: newRepsBySet,
+            weight_by_set: newWeightBySet
+          };
+        })
+      };
+    }));
+  };
 
   const updateBlockRest = (id: string, delta: number) =>
     setBlocks((prev) =>
@@ -121,6 +182,42 @@ export function useRoutineBuilder(routineId?: string) {
       prev.map((b) =>
         b.id === blockId
           ? { ...b, exercises: b.exercises.map((ex, i) => (i === idx ? { ...ex, reps: Math.max(1, reps) } : ex)) }
+          : b
+      )
+    );
+
+  const updateExerciseRepsBySet = (blockId: string, idx: number, setIndex: number, reps: number) =>
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? {
+              ...b,
+              exercises: b.exercises.map((ex, i) => {
+                if (i !== idx) return ex;
+                // Crear copia del array existente y actualizar solo el valor específico
+                const newRepsBySet = [...ex.reps_by_set];
+                newRepsBySet[setIndex] = reps;
+                return { ...ex, reps_by_set: newRepsBySet };
+              }),
+            }
+          : b
+      )
+    );
+
+  const updateExerciseWeightBySet = (blockId: string, idx: number, setIndex: number, weight: number) =>
+    setBlocks((prev) =>
+      prev.map((b) =>
+        b.id === blockId
+          ? {
+              ...b,
+              exercises: b.exercises.map((ex, i) => {
+                if (i !== idx) return ex;
+                // Crear copia del array existente y actualizar solo el valor específico
+                const newWeightBySet = [...ex.weight_by_set];
+                newWeightBySet[setIndex] = weight;
+                return { ...ex, weight_by_set: newWeightBySet };
+              }),
+            }
           : b
       )
     );
@@ -141,6 +238,24 @@ export function useRoutineBuilder(routineId?: string) {
         const exercises = b.exercises.filter((_, i) => i !== index);
         const type: BlockType = b.type === 'superset' && exercises.length <= 1 ? 'single' : b.type;
         return { ...b, exercises, type };
+      })
+    );
+
+  const changeExerciseInBlock = (blockId: string, index: number, exercise: ExercisePick) =>
+    setBlocks((prev) =>
+      prev.map((b) => {
+        if (b.id !== blockId) return b;
+        const exercises = b.exercises.map((ex, i) => 
+          i === index 
+            ? {
+                ...ex,
+                exercise_id: exercise.id,
+                name: exercise.name || 'Ejercicio',
+                image_url: exercise.image_url || null,
+              }
+            : ex
+        );
+        return { ...b, exercises };
       })
     );
 
@@ -174,8 +289,11 @@ export function useRoutineBuilder(routineId?: string) {
     updateBlockSets,
     updateBlockRest,
     updateExerciseReps,
+    updateExerciseRepsBySet,
+    updateExerciseWeightBySet,
     updateExerciseSets,
     removeExerciseInBlock,
+    changeExerciseInBlock,
     removeBlock,
     save,
   };

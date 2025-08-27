@@ -13,7 +13,14 @@ export type Exercise = {
   is_public: boolean;
 };
 
-type AddPayload = { name: string; imageUri?: string | null };
+type AddPayload = { 
+  name: string; 
+  imageUri?: string | null;
+  description?: string;
+  steps: string[];
+  muscles: string[];
+  material: string[];
+};
 
 const BUCKET = "exercises";
 
@@ -170,7 +177,7 @@ export function useExercises(userId?: string) {
   }, []);
 
   const add = useCallback(
-    async ({ name, imageUri }: AddPayload) => {
+    async ({ name, imageUri, description, steps, muscles, material }: AddPayload) => {
       if (!userId) throw new Error("No hay usuario");
       try {
         setSaving(true);
@@ -186,7 +193,15 @@ export function useExercises(userId?: string) {
 
         const { data, error } = await supabase
           .from("exercises")
-          .insert({ user_id: userId, name, image_url: publicUrl })
+          .insert({ 
+            user_id: userId, 
+            name, 
+            image_url: publicUrl,
+            description,
+            steps,
+            muscles,
+            material
+          })
           .select("*")
           .single();
 

@@ -23,6 +23,8 @@ export async function loadRoutineAndBlocks(routineId: string): Promise<{
       reps,
       rest_seconds,
       order_index,
+      reps_by_set,
+      weight_by_set,
       exercises(name,image_url)
     `)
     .eq('routine_id', routineId)

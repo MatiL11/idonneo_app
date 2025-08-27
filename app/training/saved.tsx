@@ -17,9 +17,7 @@ import { useExercises, Exercise } from '../../src/hooks/useExercises';
 import { useRoutines, Routine } from '../../src/hooks/useRoutines';
 import { useAuthStore } from '../../src/lib/store';
 import { supabase } from '../../src/lib/supabase';
-import AddExerciseModal from '../../src/components/training/AddExerciseModal';
-import AddRoutineModal from '../../src/components/training/AddRoutineModal';
-import AddProgramModal from '../../src/components/training/AddProgramModal';
+import UnifiedModal from '../../src/components/training/UnifiedModal';
 import RoutineOptionsMenu from '../../src/components/training/RoutineOptionsMenu';
 import ProgramOptionsMenu from '../../src/components/training/ProgramOptionsMenu';
 import ExerciseOptionsMenu from '../../src/components/training/ExerciseOptionsMenu';
@@ -149,7 +147,14 @@ export default function SavedPane() {
   const removeRoutine = rt?.remove;
   const refreshRoutines = rt?.load;
 
-  const onSubmitNewExercise = async (payload: { name: string; imageUri?: string | null }) => {
+  const onSubmitNewExercise = async (payload: { 
+    name: string; 
+    imageUri?: string | null;
+    description?: string;
+    steps: string[];
+    muscles: string[];
+    material: string[];
+  }) => {
     if (!addExercise) {
       console.error("La función addExercise no está disponible");
       return;
@@ -216,7 +221,13 @@ export default function SavedPane() {
       Alert.alert('Rutina destacada', 'Esta es una rutina de ejemplo. Crea tu propia rutina para personalizarla.');
       return;
     }
-    router.push(`/training/routine/${routine.id}`);
+    // Navegar a la vista detallada de rutina (solo lectura)
+    router.push(`/training/routine/${routine.id}/view`);
+  };
+  
+  const handleEditRoutine = () => {
+    if (!selectedRoutine) return;
+    router.push(`/training/routine/${selectedRoutine.id}`);
   };
 
   // Función para eliminar un programa
@@ -529,27 +540,31 @@ export default function SavedPane() {
         <Ionicons name="add" size={26} color="#fff" />
       </TouchableOpacity>
 
-      {/* Modal para crear ejercicio */}
-      <AddExerciseModal
+      {/* Modal unificado para crear ejercicio, rutina o programa */}
+      <UnifiedModal
         visible={showAddExercise}
         onClose={() => setShowAddExercise(false)}
+        type="exercise"
+        title="Nuevo ejercicio"
         onSubmit={onSubmitNewExercise}
         onPickImage={ex?.pickImage || (async () => null)}
         saving={ex?.saving}
       />
       
-      {/* Modal para crear rutina */}
-      <AddRoutineModal
+      <UnifiedModal
         visible={showAddRoutine}
         onClose={() => setShowAddRoutine(false)}
+        type="routine"
+        title="Nueva rutina"
         onSubmit={onSubmitNewRoutine}
         saving={rt?.saving}
       />
       
-      {/* Modal para crear programa */}
-      <AddProgramModal
+      <UnifiedModal
         visible={showAddProgram}
         onClose={() => setShowAddProgram(false)}
+        type="program"
+        title="Crear Programa"
         onSubmit={onSubmitNewProgram}
         routines={routines}
         saving={savingProgram}
@@ -561,6 +576,7 @@ export default function SavedPane() {
           visible={showRoutineOptions}
           onClose={() => setShowRoutineOptions(false)}
           onDelete={handleDeleteRoutine}
+          onEdit={handleEditRoutine}
           routineName={selectedRoutine.title}
           isFeatureItem={selectedRoutine.user_id === 'featured'}
         />

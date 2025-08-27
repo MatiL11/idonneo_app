@@ -16,6 +16,7 @@ interface RoutineMenuProps {
   visible: boolean;
   onClose: () => void;
   onDelete: () => Promise<void>;
+  onEdit?: () => void;
   routineName: string;
   isFeatureItem?: boolean;
 }
@@ -24,6 +25,7 @@ export default function RoutineOptionsMenu({
   visible, 
   onClose, 
   onDelete,
+  onEdit,
   routineName,
   isFeatureItem = false
 }: RoutineMenuProps) {
@@ -86,6 +88,19 @@ export default function RoutineOptionsMenu({
             </Text>
           </View>
           
+          {!isFeatureItem && onEdit && (
+            <TouchableOpacity 
+              style={styles.menuItem} 
+              onPress={() => {
+                onEdit();
+                onClose();
+              }}
+            >
+              <Ionicons name="create-outline" size={24} color={COLORS.green} />
+              <Text style={[styles.menuText, {color: COLORS.green}]}>Editar</Text>
+            </TouchableOpacity>
+          )}
+
           <TouchableOpacity 
             style={styles.menuItem} 
             onPress={handleShare}

@@ -5,6 +5,8 @@ export type RoutineExerciseRow = {
   reps: number;
   rest_seconds: number;
   order_index: number;
+  reps_by_set: number[]; // Array de repeticiones por serie (obligatorio)
+  weight_by_set: number[]; // Array de peso por serie (obligatorio)
   exercises?: { name?: string; image_url?: string | null } | null;
 };
 
@@ -18,6 +20,8 @@ export type BlockExercise = {
   image_url?: string | null;
   reps: number;
   sets: number;
+  reps_by_set: number[]; // Array de repeticiones por serie (obligatorio)
+  weight_by_set: number[]; // Array de peso por serie (obligatorio)
 };
 
 export type Block = {

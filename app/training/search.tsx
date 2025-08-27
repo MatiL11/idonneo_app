@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Image, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Image, Platform, ActivityIndicator, Alert } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../../src/styles/tokens';
 import { router } from 'expo-router';
@@ -25,8 +25,6 @@ type SearchItem = {
   image_url?: string | null;
   type: 'exercise' | 'routine' | 'program';
   created_at?: string;
-  isPublic?: boolean;
-  owner?: string;
 };
 
 export default function SearchPane() {
@@ -132,18 +130,16 @@ export default function SearchPane() {
   const searchItems: SearchItem[] = useMemo(() => {
     const items: SearchItem[] = [];
     
-    // Agregar ejercicios
-    if (activeTypes.includes('exercise')) {
-      items.push(...exercises.map(ex => ({
-        id: ex.id,
-        name: ex.name,
-        image_url: ex.image_url,
-        type: 'exercise' as const,
-        created_at: ex.created_at,
-        isPublic: ex.is_public, // Usar la bandera is_public de la base de datos
-        owner: ex.user_id
-      })));
-    }
+         // Agregar ejercicios
+     if (activeTypes.includes('exercise')) {
+       items.push(...exercises.map(ex => ({
+         id: ex.id,
+         name: ex.name,
+         image_url: ex.image_url,
+         type: 'exercise' as const,
+         created_at: ex.created_at,
+       })));
+     }
     
     // Agregar rutinas
     if (activeTypes.includes('routine')) {
@@ -184,36 +180,38 @@ export default function SearchPane() {
   // Navegar al detalle del elemento
   const navigateToItem = (item: SearchItem) => {
     if (item.type === 'exercise') {
-      // Navegar a detalle de ejercicio (puedes implementar esta vista)
-      alert('Ver detalle de ejercicio: ' + item.name);
+      // Navegar a la nueva vista de detalle de ejercicio
+      router.push(`/training/exercise/${item.id}`);
     } else if (item.type === 'routine') {
-      router.push(`/training/routine/${item.id}`);
+      // Ya no navegamos directamente a la edición de rutina
+      // Aquí podríamos mostrar una vista previa o un menú de opciones
+      Alert.alert(
+        `Rutina: ${item.name}`,
+        '¿Qué deseas hacer con esta rutina?',
+        [
+          {
+            text: 'Ver detalles',
+            style: 'default',
+            // Aquí podrías navegar a una vista de detalles
+            onPress: () => {}
+          },
+          {
+            text: 'Editar',
+            style: 'default',
+            onPress: () => router.push(`/training/routine/${item.id}`)
+          },
+          {
+            text: 'Cancelar',
+            style: 'cancel'
+          }
+        ]
+      );
     } else if (item.type === 'program') {
       router.push(`/training/program/${item.id}`);
     }
   };
   
-  // Actualizar visibilidad pública/privada de un ejercicio
-  const togglePublicStatus = async (item: SearchItem) => {
-    if (item.type !== 'exercise' || item.owner !== userId) return;
-    
-    try {
-      setLoading(true);
-      const { error } = await supabase
-        .from('exercises')
-        .update({ is_public: !item.isPublic })
-        .eq('id', item.id);
-      
-      if (error) throw error;
-      
-      // Recargar datos para reflejar el cambio
-      await loadData();
-    } catch (error) {
-      console.error('Error al actualizar visibilidad del ejercicio:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   return (
     <View style={{ flex: 1 }}>
@@ -327,27 +325,10 @@ export default function SearchPane() {
                       {item.name}
                     </Text>
                     
-                    {/* Indicador de ejercicio público */}
-                    {item.isPublic && (
-                      <View style={styles.publicBadge}>
-                        <Text style={styles.publicText}>Global</Text>
-                      </View>
-                    )}
+                    
                   </View>
                   
-                  {/* Botón para alternar visibilidad si es propio */}
-                  {item.type === 'exercise' && item.owner === userId && (
-                    <TouchableOpacity 
-                      onPress={() => togglePublicStatus(item)}
-                      style={styles.visibilityButton}
-                    >
-                      <Ionicons 
-                        name={item.isPublic ? "eye-outline" : "eye-off-outline"} 
-                        size={18} 
-                        color="#fff" 
-                      />
-                    </TouchableOpacity>
-                  )}
+
                 </View>
 
                 {item.description ? (
@@ -491,28 +472,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   
-  /** Indicadores de ejercicios públicos/globales */
-  publicBadge: {
-    backgroundColor: '#6366F1', // Color índigo/violeta
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  publicText: {
-    color: 'white',
-    fontSize: 10,
-    fontWeight: '600',
-  },
+
   
-  /** Botón de visibilidad */
-  visibilityButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
+
 });
