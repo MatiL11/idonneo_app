@@ -17,6 +17,34 @@ export default function RoutineLayout() {
           title: 'Detalle de Rutina'
         }} 
       />
+      <Stack.Screen 
+        name="session-config" 
+        options={{ 
+          headerShown: false,
+          headerTitle: '',
+        }} 
+      />
+      <Stack.Screen 
+        name="warmup" 
+        options={{ 
+          headerShown: false,
+          headerTitle: '',
+        }} 
+      />
+      <Stack.Screen 
+        name="session" 
+        options={{ 
+          headerShown: false,
+          headerTitle: '',
+        }} 
+      />
+      <Stack.Screen 
+        name="completed" 
+        options={{ 
+          headerShown: false,
+          headerTitle: '',
+        }} 
+      />
     </Stack>
   );
 }

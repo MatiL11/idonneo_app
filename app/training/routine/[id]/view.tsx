@@ -9,6 +9,7 @@ import ReadOnlyBlockCard from '../../../../src/components/training/routineBuilde
 import { useRoutineBuilder } from '../../../../src/hooks/useRoutineBuilder';
 import { supabase } from '../../../../src/lib/supabase';
 import { useState, useEffect } from 'react';
+import { COLORS } from '../../../../src/styles/tokens';
 
 export default function RoutineViewScreen() {
   const { id } = useLocalSearchParams();
@@ -55,8 +56,8 @@ export default function RoutineViewScreen() {
     );
   }
 
-  const handleEditPress = () => {
-    router.push(`/training/routine/${id}`);
+  const handleStartTraining = () => {
+    router.push(`/training/routine/${id}/session-config`);
   };
 
   return (
@@ -101,7 +102,7 @@ export default function RoutineViewScreen() {
       {/* Botón de comenzar entrenamiento */}
       <TouchableOpacity 
         style={styles.startTrainingButton}
-        onPress={handleEditPress}
+        onPress={handleStartTraining}
       >
         <Text style={styles.startTrainingButtonText}>COMENZAR ENTRENAMIENTO</Text>
       </TouchableOpacity>
@@ -190,7 +191,7 @@ const styles = StyleSheet.create({
     bottom: 20,
     left: 16,
     right: 16,
-    backgroundColor: '#16A34A',
+    backgroundColor: COLORS.green,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
