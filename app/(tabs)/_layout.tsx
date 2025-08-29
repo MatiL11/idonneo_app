@@ -49,13 +49,13 @@ export default function TabsLayout() {
             }}
         />
         <Tabs.Screen
-            name="entrenamiento"
-                options={{
+            name="training"
+            options={{
                 title: 'Entrenamiento',
                 tabBarIcon: ({ color, size }) => (
                 <FontAwesome5 name="dumbbell" size={size} color={color} />
             ),
-            headerShown: false,
+                headerShown: false,
             }}
         />
         <Tabs.Screen
