@@ -1,27 +1,27 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
+  Text,
   StyleSheet,
   LayoutAnimation,
   Platform,
   UIManager,
-  FlatList,
+  ScrollView,
   Alert,
+  TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 import { useRouter } from 'expo-router';
-import { COLORS, RADII } from '../../../../src/styles/tokens';
+import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../../../src/styles/tokens';
 import { useAuthStore } from '../../../../src/lib/store';
 import { useRoutines, Routine } from '../../../../src/hooks/useRoutines';
 import SelectRoutineModal from '../../../../src/components/training/SelectRoutineModal';
-import CalendarRoutineMenu from '../../../../src/components/training/CalendarRoutineMenu';
 
 import { useWeekPlan, PlanItem, PlanMap } from '../../../../src/hooks/useWeekPlans';
-import { HeaderBar } from '../../../../src/components/training/HeaderBar';
-import { WeekBar } from '../../../../src/components/training/WeekBar';
-import { DayItem, DayVM } from '../../../../src/components/training/DayItem';
+import { HeaderBar, WeekNavigation, WhiteSheet, DayCard } from '../../../../src/components/shared';
 import { WeekSkeleton } from '../../../../src/components/training/WeekSkeleton';
 
 dayjs.locale('es');
@@ -36,13 +36,24 @@ const mondayStart = (d: dayjs.Dayjs) => {
   return d.subtract(shift, 'day').startOf('day');
 };
 
+// Interfaz local para los días de la semana
+interface DayVM {
+  iso: string;          // YYYY-MM-DD
+  isToday: boolean;
+  dayAbbr: string;      // ej: "LUN"
+  dayNumber: string;    // ej: "25"
+  hasRoutine?: boolean;
+  title?: string;
+  subtitle?: string;
+}
+
 export default function EditWeekTemplateScreen() {
   const router = useRouter();
   const session = useAuthStore((s) => s.session);
   const userId = session?.user?.id;
 
   const [anchor, setAnchor] = useState(dayjs());
-  const [expandedIso, setExpandedIso] = useState<string | null>(null);
+
 
   const { plan, setPlan, loading, saving, hasUnsaved, save } = useWeekPlan(userId, anchor);
 
@@ -66,7 +77,8 @@ export default function EditWeekTemplateScreen() {
       return {
         iso,
         isToday: d.isSame(dayjs(), 'day'),
-        label: `${WD3[i]}${d.format('DD')}`,
+        dayAbbr: WD3[i],
+        dayNumber: d.format('DD'),
         hasRoutine: !!p,
         title: p?.title,
         subtitle: p?.subtitle,
@@ -74,11 +86,7 @@ export default function EditWeekTemplateScreen() {
     });
   }, [anchor, plan]);
 
-  const rangeLabel = useMemo(() => {
-    const start = mondayStart(anchor);
-    const end = start.clone().add(6, 'day');
-    return `${start.format('DD MMM YYYY')} - ${end.format('DD MMM YYYY')}`;
-  }, [anchor]);
+
 
   const confirmNavigationIfChanged = useCallback(
     (cb: () => void) => {
@@ -107,7 +115,6 @@ export default function EditWeekTemplateScreen() {
     confirmNavigationIfChanged(() => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setAnchor((a) => a.clone().subtract(1, 'week'));
-      setExpandedIso(null);
     });
   }, [confirmNavigationIfChanged, loading]);
 
@@ -116,14 +123,10 @@ export default function EditWeekTemplateScreen() {
     confirmNavigationIfChanged(() => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       setAnchor((a) => a.clone().add(1, 'week'));
-      setExpandedIso(null);
     });
   }, [confirmNavigationIfChanged, loading]);
 
-  const toggleExpand = useCallback((iso: string) => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandedIso((curr) => (curr === iso ? null : iso));
-  }, []);
+
 
   const openRoutineSelector = useCallback((iso: string) => {
     setSelectedDate(iso);
@@ -144,7 +147,6 @@ export default function EditWeekTemplateScreen() {
       };
 
       setPlan((current) => ({ ...current, [dateToUpdate]: newPlanItem }));
-      setExpandedIso(dateToUpdate);
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     },
     [selectedDate, setPlan]
@@ -170,40 +172,54 @@ export default function EditWeekTemplateScreen() {
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
       <HeaderBar
+        title="Editar Plan"
         onBack={() => router.back()}
-        saving={saving}
-        loading={loading}
-        hasUnsaved={hasUnsaved}
-        onSave={save}
+        rightButton={{
+          icon: 'checkmark',
+          text: 'Guardar',
+          onPress: save,
+          variant: 'primary'
+        }}
       />
 
-      <View style={styles.panel}>
-        <WeekBar label={rangeLabel} disabled={loading} onPrev={goPrevWeek} onNext={goNextWeek} />
+      <WhiteSheet>
+        <WeekNavigation
+          startDate={mondayStart(anchor).format('DD MMM YYYY')}
+          endDate={mondayStart(anchor).add(6, 'day').format('DD MMM YYYY')}
+          onPrevWeek={goPrevWeek}
+          onNextWeek={goNextWeek}
+        />
 
-        {loading ? (
-          <WeekSkeleton />
-        ) : (
-          <FlatList
-            data={days}
-            keyExtractor={(d) => d.iso}
-            contentContainerStyle={{ paddingBottom: 24 }}
-            ItemSeparatorComponent={() => <View style={{ height: 12 }} />}
-            renderItem={({ item }) => (
-              <DayItem
-                item={item}
-                isOpen={expandedIso === item.iso}
-                onToggle={toggleExpand}
-                onAdd={openRoutineSelector}
-                onMenu={openRoutineMenu}
-              />
-            )}
-            removeClippedSubviews
-            initialNumToRender={7}
-            maxToRenderPerBatch={7}
-            windowSize={5}
-          />
-        )}
-      </View>
+        <ScrollView style={styles.contentContainer} showsVerticalScrollIndicator={false}>
+          {loading ? (
+            <WeekSkeleton />
+          ) : (
+            days.map((item, idx) => (
+              <DayCard
+                key={idx}
+                dayAbbr={item.dayAbbr}
+                dayNumber={item.dayNumber}
+                isToday={item.isToday}
+                onAddMeal={() => openRoutineSelector(item.iso)}
+              >
+                {item.hasRoutine && (
+                  <View style={styles.routineCard}>
+                    <View style={styles.routineInfo}>
+                      <Text style={styles.routineTitle}>{item.title}</Text>
+                    </View>
+                    <TouchableOpacity 
+                      style={styles.removeBtn} 
+                      onPress={() => removeRoutine(item.iso)}
+                    >
+                      <Ionicons name="close" size={18} color="#666" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </DayCard>
+            ))
+          )}
+        </ScrollView>
+      </WhiteSheet>
 
       <SelectRoutineModal
         visible={showRoutineSelector}
@@ -211,28 +227,46 @@ export default function EditWeekTemplateScreen() {
         onSelect={handleSelectRoutine}
         routines={routines}
         loading={isLoadingRoutines}
-        dayLabel={selectedDate ? days.find((d) => d.iso === selectedDate)?.label || 'día' : ''}
+        dayLabel={selectedDate ? days.find((d) => d.iso === selectedDate) ? `${WD3[days.findIndex(d => d.iso === selectedDate)]}${days.find((d) => d.iso === selectedDate)?.dayNumber}` : 'día' : ''}
       />
-
-      {selectedRoutine && (
-        <CalendarRoutineMenu
-          visible={showRoutineMenu}
-          onClose={() => setShowRoutineMenu(false)}
-          onRemove={() => removeRoutine(selectedRoutine.iso)}
-          routineName={selectedRoutine.title}
-        />
-      )}
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.black },
-  panel: {
+  contentContainer: {
     flex: 1,
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: RADII.panel,
-    borderTopRightRadius: RADII.panel,
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  routineCard: {
+    marginTop: 6,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  routineInfo: {
+    flex: 1,
+  },
+  routineTitle: { 
+    color: COLORS.black, 
+    fontSize: 16, 
+    fontWeight: '700' 
+  },
+  removeBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#F3F4F6',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
 });

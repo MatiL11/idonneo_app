@@ -5,6 +5,7 @@ export default function NutricionLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="index" />
       <Stack.Screen name="calendar/index" />
+      <Stack.Screen name="calendar/edit" />
     </Stack>
   );
 }

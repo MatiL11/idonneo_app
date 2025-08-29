@@ -105,6 +105,7 @@ export default function NutritionCalendarScreen() {
   const [marked, setMarked] = useState<Marked>({});
   const [selectedDayData, setSelectedDayData] = useState<NutritionDay | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const monthLabel = useMemo(() => dayjs(current).format('MMMM YYYY'), [current]);
 
@@ -112,8 +113,6 @@ export default function NutritionCalendarScreen() {
   const loadMonth = useCallback(async () => {
     setLoading(true);
     try {
-      // En una app real, aquí cargarías datos de nutrición desde la base de datos
-      // Por ahora usamos datos de ejemplo
       
       // Simular carga
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -167,6 +166,15 @@ export default function NutritionCalendarScreen() {
 
   return (
     <SafeAreaView style={styles.root} edges={['top']}>
+      {/* Overlay para cerrar menú al tocar fuera */}
+      {showMenu && (
+        <TouchableOpacity
+          style={styles.menuBackdrop}
+          activeOpacity={1}
+          onPress={() => setShowMenu(false)}
+        />
+      )}
+      
       {/* Header superior */}
       <View style={styles.topHeader}>
         <TouchableOpacity onPress={() => router.back()} style={styles.circleBtn}>
@@ -176,14 +184,49 @@ export default function NutritionCalendarScreen() {
         <Text style={styles.topTitle}>Plan Nutricional</Text>
 
         <TouchableOpacity
-          onPress={() => {
-            // TODO: Implementar edición del plan nutricional
-            console.log('Editar plan nutricional');
-          }}
+          onPress={() => setShowMenu(!showMenu)}
           style={styles.circleBtn}
         >
-          <Ionicons name="pencil" size={18} color="#fff" />
+          <Ionicons name="ellipsis-horizontal" size={18} color="#fff" />
         </TouchableOpacity>
+
+        {/* Menú contextual */}
+        {showMenu && (
+          <View style={styles.menuOverlay}>
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                router.push('/nutricion/calendar/edit');
+              }}
+            >
+              <Ionicons name="pencil" size={20} color="#333" />
+              <Text style={styles.menuText}>Editar plan</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                console.log('Ver lista de compras');
+              }}
+            >
+              <Ionicons name="clipboard" size={20} color="#333" />
+              <Text style={styles.menuText}>Ver lista de compras</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => {
+                setShowMenu(false);
+                console.log('Generar lista');
+              }}
+            >
+              <Ionicons name="cart" size={20} color="#333" />
+              <Text style={styles.menuText}>Generar lista</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Card con calendario */}
@@ -239,27 +282,33 @@ export default function NutritionCalendarScreen() {
 
       {/* Panel blanco inferior */}
       <View style={styles.bodyWhite}>
-        {/* Resumen de nutrientes */}
-        {selectedDayData && (
-          <View style={styles.nutrientBar}>
-            <View style={styles.nutrientItem}>
-              <Text style={styles.nutrientValue}>{selectedDayData.nutrients.proteins}g</Text>
-              <Text style={styles.nutrientLabel}>Proteínas</Text>
-            </View>
-            <View style={styles.nutrientItem}>
-              <Text style={styles.nutrientValue}>{selectedDayData.nutrients.carbs}g</Text>
-              <Text style={styles.nutrientLabel}>Carbs</Text>
-            </View>
-            <View style={styles.nutrientItem}>
-              <Text style={styles.nutrientValue}>{selectedDayData.nutrients.fats}g</Text>
-              <Text style={styles.nutrientLabel}>Grasas</Text>
-            </View>
-            <View style={styles.nutrientItem}>
-              <Text style={styles.nutrientValue}>{selectedDayData.nutrients.calories}</Text>
-              <Text style={styles.nutrientLabel}>Calorías</Text>
-            </View>
+        {/* Resumen de nutrientes - SIEMPRE visible */}
+        <View style={styles.nutrientBar}>
+          <View style={styles.nutrientItem}>
+            <Text style={styles.nutrientValue}>
+              {selectedDayData ? `${selectedDayData.nutrients.proteins}g` : '-'}
+            </Text>
+            <Text style={styles.nutrientLabel}>Proteínas</Text>
           </View>
-        )}
+          <View style={styles.nutrientItem}>
+            <Text style={styles.nutrientValue}>
+              {selectedDayData ? `${selectedDayData.nutrients.carbs}g` : '-'}
+            </Text>
+            <Text style={styles.nutrientLabel}>Carbs</Text>
+          </View>
+          <View style={styles.nutrientItem}>
+            <Text style={styles.nutrientValue}>
+              {selectedDayData ? `${selectedDayData.nutrients.fats}g` : '-'}
+            </Text>
+            <Text style={styles.nutrientLabel}>Grasas</Text>
+          </View>
+          <View style={styles.nutrientItem}>
+            <Text style={styles.nutrientValue}>
+              {selectedDayData ? selectedDayData.nutrients.calories : '-'}
+            </Text>
+            <Text style={styles.nutrientLabel}>Calorías</Text>
+          </View>
+        </View>
 
         {/* Menús del día */}
         <View style={styles.dayPill}>
@@ -273,8 +322,9 @@ export default function NutritionCalendarScreen() {
           )}
         </View>
 
-        {/* Lista de comidas */}
-        {selectedDayData && (
+        {/* Contenido del día */}
+        {selectedDayData ? (
+          // Con datos: mostrar comidas
           <View style={styles.mealsContainer}>
             {selectedDayData.meals.breakfast && (
               <View style={styles.mealItem}>
@@ -311,6 +361,11 @@ export default function NutritionCalendarScreen() {
                 <Text style={styles.mealTitle}>{selectedDayData.meals.snacks.join(', ')}</Text>
               </View>
             )}
+          </View>
+        ) : (
+          // Sin datos: mostrar mensaje
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>Nada programado</Text>
           </View>
         )}
       </View>
@@ -412,5 +467,59 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 40,
+  },
+  emptyStateText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#666',
+    textAlign: 'center',
+  },
+  
+  menuOverlay: {
+    position: 'absolute',
+    top: 50,
+    right: 0,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    minWidth: 180,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  menuText: {
+    fontSize: 16,
+    color: '#333',
+    marginLeft: 12,
+    fontWeight: '500',
+  },
+  
+  menuBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 999,
   },
 });
