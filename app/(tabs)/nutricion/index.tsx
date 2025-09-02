@@ -1,10 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, FlatList, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, RADII } from '../../../src/styles/tokens';
 import SavedNutritionScreen from './saved';
+import SearchRecipesScreen from './search';
+import { useNutritionPlans } from '../../../src/hooks/useNutritionPlans';
+import dayjs from 'dayjs';
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -14,6 +17,25 @@ interface Meal {
   category: string;
   image: string;
   calories: string;
+}
+
+interface DatabaseMeal {
+  id: string;
+  meal_type: 'breakfast' | 'lunch' | 'merienda' | 'dinner' | 'snack';
+  notes: string;
+  recipe_id?: string;
+  portions_consumed?: number;
+  recipes?: {
+    id: string;
+    title: string;
+    image_url?: string;
+    cooking_time?: string;
+    portions?: number;
+    calories_per_100g?: number;
+    protein_per_100g?: number;
+    carbs_per_100g?: number;
+    fat_per_100g?: number;
+  };
 }
 
 const TODAYS_MENU: Meal[] = [
@@ -27,13 +49,6 @@ const TODAYS_MENU: Meal[] = [
 ];
 
 const FEATURED_MEALS: Meal[] = [
-  {
-    id: '1',
-    title: 'Bowl de Açaí con Frutas',
-    category: 'Desayuno',
-    image: 'https://images.unsplash.com/photo-1546039907-8d3112854e32?w=500',
-    calories: '320 kcal',
-  },
   {
     id: '2',
     title: 'Pollo al Curry con Arroz',
@@ -61,7 +76,10 @@ function startOfWeek(d = new Date()) {
 
 export default function NutricionScreen() {
   const router = useRouter();
+  const { loadNutritionPlan } = useNutritionPlans();
   const [topTab, setTopTab] = useState<'overview' | 'search' | 'saved'>('overview');
+  const [todaysMeals, setTodaysMeals] = useState<Meal[]>([]);
+  const [loadingMeals, setLoadingMeals] = useState(false);
 
   const weekItems = useMemo(() => {
     const monday = startOfWeek(new Date());
@@ -73,6 +91,57 @@ export default function NutricionScreen() {
   }, []);
 
   const todayKey = new Date().toDateString();
+
+  // Cargar comidas del día actual
+  useEffect(() => {
+    loadTodaysMeals();
+  }, []);
+
+  const loadTodaysMeals = async () => {
+    try {
+      setLoadingMeals(true);
+      const today = dayjs().format('YYYY-MM-DD');
+      
+      const { mealsByDay } = await loadNutritionPlan(today, today);
+      
+      if (mealsByDay && mealsByDay[today]) {
+        const meals = mealsByDay[today];
+        const convertedMeals: Meal[] = meals.map((meal: DatabaseMeal) => {
+          const mealName = meal.recipes?.title || meal.notes?.replace('Planificado: ', '') || 'Comida sin nombre';
+          const mealImage = meal.recipes?.image_url || '🍽️';
+          const calories = meal.recipes?.calories_per_100g 
+            ? `${Math.round((meal.recipes.calories_per_100g * (meal.portions_consumed || 1)) * 10) / 10} kcal`
+            : 'Sin datos';
+          
+          // Mapear tipos de comida a categorías en español
+          const categoryMap = {
+            'breakfast': 'Desayuno',
+            'lunch': 'Almuerzo',
+            'merienda': 'Merienda',
+            'dinner': 'Cena',
+            'snack': 'Snack'
+          };
+          
+          return {
+            id: meal.id,
+            title: mealName,
+            category: categoryMap[meal.meal_type] || meal.meal_type,
+            image: mealImage,
+            calories: calories,
+          };
+        });
+        
+        setTodaysMeals(convertedMeals);
+      } else {
+        setTodaysMeals([]);
+      }
+    } catch (error) {
+      console.error('Error al cargar comidas del día:', error);
+      setTodaysMeals([]);
+    } finally {
+      setLoadingMeals(false);
+    }
+  };
 
   const goToCalendar = () => {
     console.log('Intentando navegar a calendario de nutrición...');
@@ -158,17 +227,34 @@ export default function NutricionScreen() {
               {/* Menú de hoy */}
               <View style={styles.todayCard}>
                 <Text style={styles.todayLabel}>Menú de hoy</Text>
-                {TODAYS_MENU.map((meal) => (
-                  <View key={meal.id} style={styles.mealCard}>
-                    <Image source={{ uri: meal.image }} style={styles.mealImage} />
-                    <View style={styles.mealInfo}>
-                      <Text style={styles.mealTitle}>{meal.title}</Text>
-                      <View style={styles.mealCategory}>
-                        <Text style={styles.mealCategoryText}>{meal.category}</Text>
+                {loadingMeals ? (
+                  <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Cargando comidas...</Text>
+                  </View>
+                ) : todaysMeals.length > 0 ? (
+                  todaysMeals.map((meal, index) => (
+                    <View key={meal.id} style={[styles.mealCard, index > 0 && styles.mealCardSpacing]}>
+                      {meal.image.startsWith('http') ? (
+                        <Image source={{ uri: meal.image }} style={styles.mealImage} />
+                      ) : (
+                        <View style={[styles.mealImage, styles.mealImagePlaceholder]}>
+                          <Text style={styles.mealImageEmoji}>{meal.image}</Text>
+                        </View>
+                      )}
+                      <View style={styles.mealInfo}>
+                        <Text style={styles.mealTitle}>{meal.title}</Text>
+                        <View style={styles.mealCategory}>
+                          <Text style={styles.mealCategoryText}>{meal.category}</Text>
+                        </View>
                       </View>
                     </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyMealsContainer}>
+                    <Text style={styles.emptyMealsText}>No hay comidas programadas para hoy</Text>
+                    <Text style={styles.emptyMealsSubtext}>Toca para planificar tu día</Text>
                   </View>
-                ))}
+                )}
               </View>
             </TouchableOpacity>
 
@@ -201,10 +287,7 @@ export default function NutricionScreen() {
                  ) : topTab === 'search' ? (
            // Vista de búsqueda
            <View style={styles.panel}>
-             <Text style={styles.sectionTitle}>Buscar alimentos</Text>
-             <Text style={styles.comingSoon}>
-               Función de búsqueda próximamente...
-             </Text>
+             <SearchRecipesScreen />
            </View>
          ) : (
            // Vista de guardados - mostrar el componente SavedNutritionScreen
@@ -318,6 +401,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
+  mealCardSpacing: {
+    marginTop: 8,
+  },
   mealImage: {
     width: 50,
     height: 50,
@@ -346,6 +432,39 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
+  loadingContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: COLORS.white,
+    fontSize: 14,
+    opacity: 0.7,
+  },
+  mealImagePlaceholder: {
+    backgroundColor: COLORS.gray100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mealImageEmoji: {
+    fontSize: 24,
+  },
+  emptyMealsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  emptyMealsText: {
+    color: COLORS.white,
+    fontSize: 14,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  emptyMealsSubtext: {
+    color: COLORS.white,
+    fontSize: 12,
+    opacity: 0.7,
+  },
+
   panel: {
     flex: 1,
     backgroundColor: COLORS.white,
@@ -372,7 +491,7 @@ const styles = StyleSheet.create({
   },
   mealImageLarge: {
     width: '100%',
-    height: 160,
+    height: 120,
   },
   mealInfoLarge: {
     padding: 12,

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS } from '../../../../src/styles/tokens';
-import { useRecipes, CreateRecipeWithImageData } from '../../../../src/hooks/useRecipes';
+import { useRecipes, CreateRecipeWithImageData, Ingredient, RecipeStep } from '../../../../src/hooks/useRecipes';
 import { useBoards } from '../../../../src/hooks/useBoards';
 import { HeaderBar, WhiteSheet } from '../../../../src/components/shared';
 
@@ -15,8 +15,8 @@ export default function CreateRecipeScreen() {
   const [title, setTitle] = useState('');
   const [portions, setPortions] = useState(1);
   const [cookingTime, setCookingTime] = useState('');
-  const [ingredients, setIngredients] = useState<string[]>(['']);
-  const [instructions, setInstructions] = useState('');
+  const [ingredients, setIngredients] = useState<Ingredient[]>([{ name: '', amount: 0, unit: 'g' }]);
+  const [instructions, setInstructions] = useState<RecipeStep[]>([{ step: 1, instruction: '' }]);
   const [notes, setNotes] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [selectedBoardIds, setSelectedBoardIds] = useState<string[]>(['mis-recetas']);
@@ -42,9 +42,15 @@ export default function CreateRecipeScreen() {
         return;
       }
 
-      const validIngredients = ingredients.filter(ingredient => ingredient.trim() !== '');
+      const validIngredients = ingredients.filter(ingredient => ingredient.name.trim() !== '');
       if (validIngredients.length === 0) {
         Alert.alert('Error', 'Por favor agrega al menos un ingrediente');
+        return;
+      }
+
+      const validSteps = instructions.filter(step => step.instruction.trim() !== '');
+      if (validSteps.length === 0) {
+        Alert.alert('Error', 'Por favor agrega al menos un paso');
         return;
       }
 
@@ -77,7 +83,7 @@ export default function CreateRecipeScreen() {
           portions,
           cooking_time: cookingTime.trim() || undefined,
           ingredients: validIngredients,
-          instructions: instructions.trim() || undefined,
+          instructions: validSteps,
           notes: notes.trim() || undefined,
           calories_per_100g: nutritionData.calories_per_100g ? parseFloat(nutritionData.calories_per_100g) : undefined,
           protein_per_100g: nutritionData.protein_per_100g ? parseFloat(nutritionData.protein_per_100g) : undefined,
@@ -133,13 +139,13 @@ export default function CreateRecipeScreen() {
   };
 
   const addIngredient = () => {
-    setIngredients(prev => [...prev, '']);
+    setIngredients(prev => [...prev, { name: '', amount: 0, unit: 'g' }]);
   };
 
-  const updateIngredient = (index: number, value: string) => {
+  const updateIngredient = (index: number, field: 'name' | 'amount' | 'unit', value: string | number) => {
     setIngredients(prev => {
       const newIngredients = [...prev];
-      newIngredients[index] = value;
+      newIngredients[index] = { ...newIngredients[index], [field]: value };
       return newIngredients;
     });
   };
@@ -147,6 +153,28 @@ export default function CreateRecipeScreen() {
   const removeIngredient = (index: number) => {
     if (ingredients.length > 1) {
       setIngredients(prev => prev.filter((_, i) => i !== index));
+    }
+  };
+
+  const addStep = () => {
+    setInstructions(prev => [...prev, { step: prev.length + 1, instruction: '' }]);
+  };
+
+  const updateStep = (index: number, instruction: string) => {
+    setInstructions(prev => {
+      const newSteps = [...prev];
+      newSteps[index] = { ...newSteps[index], instruction };
+      return newSteps;
+    });
+  };
+
+  const removeStep = (index: number) => {
+    if (instructions.length > 1) {
+      setInstructions(prev => {
+        const newSteps = prev.filter((_, i) => i !== index);
+        // Renumerar los pasos
+        return newSteps.map((step, i) => ({ ...step, step: i + 1 }));
+      });
     }
   };
 
@@ -335,13 +363,32 @@ export default function CreateRecipeScreen() {
             <Text style={styles.sectionTitle}>Ingredientes</Text>
             {ingredients.map((ingredient, index) => (
               <View key={index} style={styles.ingredientRow}>
-                <TextInput
-                  style={styles.ingredientInput}
-                  placeholder="Agregar ingrediente"
-                  placeholderTextColor={COLORS.gray300}
-                  value={ingredient}
-                  onChangeText={(value) => updateIngredient(index, value)}
-                />
+                <View style={styles.ingredientInputs}>
+                  <TextInput
+                    style={[styles.ingredientInput, styles.ingredientNameInput]}
+                    placeholder="Nombre del ingrediente"
+                    placeholderTextColor={COLORS.gray300}
+                    value={ingredient.name}
+                    onChangeText={(value) => updateIngredient(index, 'name', value)}
+                  />
+                  <View style={styles.amountRow}>
+                    <TextInput
+                      style={[styles.ingredientInput, styles.amountInput]}
+                      placeholder="0"
+                      placeholderTextColor={COLORS.gray300}
+                      value={ingredient.amount.toString()}
+                      onChangeText={(value) => updateIngredient(index, 'amount', parseFloat(value) || 0)}
+                      keyboardType="numeric"
+                    />
+                    <TextInput
+                      style={[styles.ingredientInput, styles.unitInput]}
+                      placeholder="g"
+                      placeholderTextColor={COLORS.gray300}
+                      value={ingredient.unit}
+                      onChangeText={(value) => updateIngredient(index, 'unit', value)}
+                    />
+                  </View>
+                </View>
                 {ingredients.length > 1 && (
                   <TouchableOpacity 
                     style={styles.removeButton}
@@ -362,16 +409,36 @@ export default function CreateRecipeScreen() {
           {/* Instrucciones Section */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Instrucciones</Text>
-            <TextInput
-              style={styles.multilineInput}
-              placeholder="Describe los pasos para preparar la receta..."
-              placeholderTextColor={COLORS.gray300}
-              value={instructions}
-              onChangeText={setInstructions}
-              multiline
-              numberOfLines={4}
-              textAlignVertical="top"
-            />
+            {instructions.map((step, index) => (
+              <View key={index} style={styles.stepRow}>
+                <View style={styles.stepNumberContainer}>
+                  <Text style={styles.stepNumber}>{step.step}</Text>
+                </View>
+                <TextInput
+                  style={styles.stepInput}
+                  placeholder={`Paso ${step.step}...`}
+                  placeholderTextColor={COLORS.gray300}
+                  value={step.instruction}
+                  onChangeText={(value) => updateStep(index, value)}
+                  multiline
+                  numberOfLines={2}
+                  textAlignVertical="top"
+                />
+                {instructions.length > 1 && (
+                  <TouchableOpacity 
+                    style={styles.removeButton}
+                    onPress={() => removeStep(index)}
+                  >
+                    <Ionicons name="close" size={20} color={COLORS.white} />
+                  </TouchableOpacity>
+                )}
+                {index === instructions.length - 1 && (
+                  <TouchableOpacity style={styles.addButton} onPress={addStep}>
+                    <Ionicons name="add" size={20} color={COLORS.white} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
           </View>
 
           {/* Notas Section */}
@@ -690,6 +757,53 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   ingredientInput: {
+    fontSize: 16,
+    color: COLORS.black,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.gray100,
+    borderRadius: 12,
+  },
+  ingredientInputs: {
+    flex: 1,
+    gap: 8,
+  },
+  ingredientNameInput: {
+    flex: 1,
+  },
+  amountRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  amountInput: {
+    flex: 1,
+    textAlign: 'center',
+  },
+  unitInput: {
+    width: 60,
+    textAlign: 'center',
+  },
+  stepRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+    marginBottom: 12,
+  },
+  stepNumberContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  stepNumber: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.white,
+  },
+  stepInput: {
     flex: 1,
     fontSize: 16,
     color: COLORS.black,
@@ -697,6 +811,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     backgroundColor: COLORS.gray100,
     borderRadius: 12,
+    minHeight: 60,
   },
   removeButton: {
     width: 40,

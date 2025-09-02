@@ -62,6 +62,17 @@ async function bodyFromUri(uri: string): Promise<Uint8Array> {
   return bytes;
 }
 
+export interface Ingredient {
+  name: string;
+  amount: number;
+  unit: string;
+}
+
+export interface RecipeStep {
+  step: number;
+  instruction: string;
+}
+
 export interface Recipe {
   id: string;
   user_id: string;
@@ -70,8 +81,8 @@ export interface Recipe {
   board_id?: string;
   portions: number;
   cooking_time?: string;
-  ingredients: string;
-  instructions?: string;
+  ingredients: string; // JSON string de Ingredient[]
+  instructions: string; // JSON string de RecipeStep[]
   notes?: string;
   calories_per_100g?: number;
   protein_per_100g?: number;
@@ -88,8 +99,8 @@ export interface CreateRecipeData {
   board_id?: string;
   portions: number;
   cooking_time?: string;
-  ingredients: string[];
-  instructions?: string;
+  ingredients: Ingredient[];
+  instructions: RecipeStep[];
   notes?: string;
   calories_per_100g?: number;
   protein_per_100g?: number;
@@ -101,6 +112,42 @@ export interface CreateRecipeData {
 export interface CreateRecipeWithImageData extends Omit<CreateRecipeData, 'image_url'> {
   imageUri?: string; // URI local de la imagen antes de subir
 }
+
+// Helper functions para manejar ingredientes
+export const parseIngredients = (ingredientsString: string): Ingredient[] => {
+  try {
+    const parsed = JSON.parse(ingredientsString);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Fallback para el formato anterior (string simple)
+    return ingredientsString.split('\n')
+      .filter(ingredient => ingredient.trim() !== '')
+      .map(ingredient => ({
+        name: ingredient.trim(),
+        amount: 0,
+        unit: 'g'
+      }));
+  }
+};
+
+export const formatIngredient = (ingredient: Ingredient): string => {
+  return `${ingredient.name} - ${ingredient.amount}${ingredient.unit}`;
+};
+
+export const parseSteps = (stepsString: string): RecipeStep[] => {
+  try {
+    const parsed = JSON.parse(stepsString);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    // Fallback para el formato anterior (string simple)
+    return stepsString.split('\n')
+      .filter(step => step.trim() !== '')
+      .map((step, index) => ({
+        step: index + 1,
+        instruction: step.trim()
+      }));
+  }
+};
 
 export function useRecipes() {
   const [loading, setLoading] = useState(false);
@@ -180,10 +227,9 @@ export function useRecipes() {
         throw new Error('Usuario no autenticado');
       }
 
-      // Convertir el array de ingredientes a string para el campo ingredients
-      const ingredientsString = recipeData.ingredients
-        .filter(ingredient => ingredient.trim() !== '')
-        .join('\n');
+      // Convertir los arrays a JSON strings
+      const ingredientsString = JSON.stringify(recipeData.ingredients);
+      const instructionsString = JSON.stringify(recipeData.instructions);
 
       // Crear la receta
       const { data: recipe, error: recipeError } = await supabase
@@ -196,7 +242,7 @@ export function useRecipes() {
           portions: recipeData.portions,
           cooking_time: recipeData.cooking_time,
           ingredients: ingredientsString,
-          instructions: recipeData.instructions,
+          instructions: instructionsString,
           notes: recipeData.notes,
           calories_per_100g: recipeData.calories_per_100g ? parseFloat(recipeData.calories_per_100g.toString()) : null,
           protein_per_100g: recipeData.protein_per_100g ? parseFloat(recipeData.protein_per_100g.toString()) : null,
@@ -246,10 +292,9 @@ export function useRecipes() {
         }
       }
 
-      // Convertir el array de ingredientes a string para el campo ingredients
-      const ingredientsString = recipeData.ingredients
-        .filter(ingredient => ingredient.trim() !== '')
-        .join('\n');
+      // Convertir los arrays a JSON strings
+      const ingredientsString = JSON.stringify(recipeData.ingredients);
+      const instructionsString = JSON.stringify(recipeData.instructions);
 
       // Crear la receta con la URL de la imagen
       const { data: recipe, error: recipeError } = await supabase
@@ -262,7 +307,7 @@ export function useRecipes() {
           portions: recipeData.portions,
           cooking_time: recipeData.cooking_time,
           ingredients: ingredientsString,
-          instructions: recipeData.instructions,
+          instructions: instructionsString,
           notes: recipeData.notes,
           calories_per_100g: recipeData.calories_per_100g ? parseFloat(recipeData.calories_per_100g.toString()) : null,
           protein_per_100g: recipeData.protein_per_100g ? parseFloat(recipeData.protein_per_100g.toString()) : null,
@@ -395,6 +440,88 @@ export function useRecipes() {
     }
   }, []);
 
+  const searchPublicRecipes = useCallback(async (query: string) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: recipes, error: searchError } = await supabase
+        .from('recipes')
+        .select(`
+          id,
+          title,
+          image_url,
+          cooking_time,
+          portions,
+          calories_per_100g,
+          protein_per_100g,
+          carbs_per_100g,
+          fat_per_100g,
+          user_id,
+          created_at
+        `)
+        .eq('is_public', true)
+        .ilike('title', `%${query}%`)
+        .order('created_at', { ascending: false });
+
+      if (searchError) {
+        throw searchError;
+      }
+
+      console.log('✅ Búsqueda de recetas públicas exitosa:', recipes?.length || 0, 'resultados');
+      return recipes || [];
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      console.error('❌ Error al buscar recetas públicas:', errorMessage);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const loadPublicRecipes = useCallback(async (limit: number = 20) => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const { data: recipes, error: fetchError } = await supabase
+        .from('recipes')
+        .select(`
+          id,
+          title,
+          image_url,
+          cooking_time,
+          portions,
+          calories_per_100g,
+          protein_per_100g,
+          carbs_per_100g,
+          fat_per_100g,
+          user_id,
+          created_at
+        `)
+        .eq('is_public', true)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      console.log('✅ Recetas públicas cargadas:', recipes?.length || 0, 'recetas');
+      return recipes || [];
+
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Error desconocido';
+      console.error('❌ Error al cargar recetas públicas:', errorMessage);
+      setError(errorMessage);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   return {
     loading,
     error,
@@ -405,5 +532,7 @@ export function useRecipes() {
     removeRecipeFromBoard,
     pickImage,
     uploadToStorage,
+    searchPublicRecipes,
+    loadPublicRecipes,
   };
 }

@@ -1,6 +1,7 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS } from '../../styles/tokens';
 
 interface MealType {
   key: string;
@@ -12,67 +13,95 @@ interface MealTypeMenuProps {
   mealTypes: MealType[];
   onSelectMealType: (mealType: string) => void;
   visible: boolean;
+  onClose: () => void;
 }
 
 export default function MealTypeMenu({ 
   mealTypes, 
   onSelectMealType, 
-  visible 
+  visible,
+  onClose
 }: MealTypeMenuProps) {
-  if (!visible) return null;
+  const handleSelectMealType = (mealType: string) => {
+    onSelectMealType(mealType);
+    onClose();
+  };
 
   return (
-    <View style={styles.mealMenu}>
-      {mealTypes.map((mealType, index) => (
-        <TouchableOpacity
-          key={mealType.key}
-          style={[
-            styles.mealMenuItem,
-            index === mealTypes.length - 1 && styles.lastMenuItem
-          ]}
-          onPress={() => onSelectMealType(mealType.key)}
-        >
-          <Ionicons name={mealType.icon as any} size={18} color="#333" />
-          <Text style={styles.mealMenuText}>{mealType.label}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={onClose}
+    >
+      <View style={styles.modalContainer}>
+        <View style={styles.modalHeader}>
+          <TouchableOpacity
+            onPress={onClose}
+            style={styles.closeButton}
+          >
+            <Ionicons name="close" size={24} color={COLORS.black} />
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Agregar Comida</Text>
+          <View style={styles.placeholder} />
+        </View>
+
+        <View style={styles.mealTypesList}>
+          {mealTypes.map((mealType) => (
+            <TouchableOpacity
+              key={mealType.key}
+              style={styles.mealTypeItem}
+              onPress={() => handleSelectMealType(mealType.key)}
+            >
+              <Ionicons name={mealType.icon as any} size={24} color={COLORS.black} />
+              <Text style={styles.mealTypeText}>{mealType.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  mealMenu: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 5,
-    position: 'absolute',
-    right: 12,
-    top: 50,
-    minWidth: 180,
-    zIndex: 1000,
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
+  modalContainer: {
+    flex: 1,
+    backgroundColor: COLORS.white,
   },
-  mealMenuItem: {
+  modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: COLORS.gray200,
   },
-  lastMenuItem: {
-    borderBottomWidth: 0,
+  closeButton: {
+    padding: 4,
   },
-  mealMenuText: { 
-    fontSize: 14, 
-    color: '#333', 
-    marginLeft: 10, 
-    fontWeight: '500' 
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: COLORS.black,
+  },
+  placeholder: {
+    width: 32, // Mismo ancho que el botón de cerrar para centrar el título
+  },
+  mealTypesList: {
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+  },
+  mealTypeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+  },
+  mealTypeText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.black,
+    marginLeft: 16,
   },
 });

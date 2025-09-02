@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../../styles/tokens';
 
 interface MealItemProps {
@@ -26,7 +27,11 @@ export default function MealItem({
         styles.mealImage, 
         isDark && styles.mealImageDark
       ]}>
-        <Text style={styles.mealImageText}>{image}</Text>
+        {image && image.startsWith('http') ? (
+          <Image source={{ uri: image }} style={styles.mealImageContent} />
+        ) : (
+          <Text style={styles.mealImageText}>{image || '🍽️'}</Text>
+        )}
       </View>
       <View style={styles.mealInfo}>
         <Text style={[
@@ -69,6 +74,11 @@ const styles = StyleSheet.create({
   },
   mealImageText: { 
     fontSize: 20 
+  },
+  mealImageContent: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 8,
   },
   mealInfo: { 
     flex: 1 

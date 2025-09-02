@@ -75,11 +75,12 @@ export default function HeaderBar({
 const styles = StyleSheet.create({
   headerRow: {
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 8,
+    paddingTop: 16,
+    paddingBottom: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: COLORS.black,
   },
   headerLeft: { 
     flexDirection: 'row', 

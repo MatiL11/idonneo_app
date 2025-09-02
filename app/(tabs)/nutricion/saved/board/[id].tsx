@@ -9,8 +9,6 @@ import { useBoards, Board } from '../../../../../src/hooks/useBoards';
 import { HeaderBar, WhiteSheet } from '../../../../../src/components/shared';
 
 const SCREEN_W = Dimensions.get('window').width;
-const HEADER_HEIGHT = 56;       // ajusta si tu HeaderBar es más alto
-const MENU_GAP = 6;             // separación vertical del ancla
 
 export default function BoardDetailScreen() {
   const router = useRouter();
@@ -25,15 +23,6 @@ export default function BoardDetailScreen() {
   // Menús
   const [showBoardMenu, setShowBoardMenu] = useState(false);
   const [showRecipeMenu, setShowRecipeMenu] = useState<string | null>(null);
-
-  // Posición dinámica del menú actualmente visible
-  const [menuCoords, setMenuCoords] = useState<{ top: number; right: number } | null>(null);
-
-  // Refs de los botones "tres puntos" de cada receta para medir su posición
-  const recipeBtnRefs = useRef<Record<string, View | null>>({});
-
-  const insets = useSafeAreaInsets();
-  const boardMenuTop = insets.top + HEADER_HEIGHT + MENU_GAP;
 
   useEffect(() => {
     loadData();
@@ -79,29 +68,13 @@ export default function BoardDetailScreen() {
   // Menú del header (tablero)
   const handleBoardMenuPress = () => {
     setShowRecipeMenu(null);
-    setMenuCoords({ top: boardMenuTop, right: 20 });
     setShowBoardMenu(v => !v);
   };
 
-  // Medir y abrir menú de una receta en el lugar correcto
+  // Abrir menú de receta desde abajo
   const handleRecipeMenuPress = (recipeId: string) => {
     setShowBoardMenu(false);
-    const ref = recipeBtnRefs.current[recipeId];
-
-    if (ref?.measureInWindow) {
-      ref.measureInWindow((x, y, width, height) => {
-        // Convertir coordenadas absolutas de ventana a coordenadas relativas al SafeAreaView
-        const top = y - insets.top + height + MENU_GAP;
-        // Alinear hacia la derecha del botón
-        const right = Math.max(12, SCREEN_W - (x + width)); // margen mínimo
-        setMenuCoords({ top, right });
-        setShowRecipeMenu(prev => (prev === recipeId ? null : recipeId));
-      });
-    } else {
-      // Fallback: si no se pudo medir, lo mostramos bajo el header
-      setMenuCoords({ top: boardMenuTop, right: 20 });
-      setShowRecipeMenu(prev => (prev === recipeId ? null : recipeId));
-    }
+    setShowRecipeMenu(prev => (prev === recipeId ? null : recipeId));
   };
 
   const handleBoardMenuOption = (option: string) => {
@@ -236,7 +209,11 @@ export default function BoardDetailScreen() {
           ) : (
             <>
               {filteredRecipes.map((recipe) => (
-                <View key={recipe.id} style={styles.recipeCard}>
+                <TouchableOpacity 
+                  key={recipe.id} 
+                  style={styles.recipeCard}
+                  onPress={() => router.push(`/nutricion/saved/recipe/${recipe.id}`)}
+                >
                   {recipe.image_url ? (
                     <Image source={{ uri: recipe.image_url }} style={styles.recipeImage} />
                   ) : (
@@ -252,20 +229,17 @@ export default function BoardDetailScreen() {
                     <Text style={styles.recipeNutrition}>{getNutritionText(recipe)}</Text>
                   </View>
 
-                  {/* wrapper con ref para medir */}
-                  <View
-                    ref={(el) => {
-                      recipeBtnRefs.current[recipe.id] = el;
+                  {/* Botón de menú de receta */}
+                  <TouchableOpacity
+                    style={styles.recipeMenuButton}
+                    onPress={(e) => {
+                      e.stopPropagation(); // Evitar que se active la navegación del card
+                      handleRecipeMenuPress(recipe.id);
                     }}
                   >
-                    <TouchableOpacity
-                      style={styles.recipeMenuButton}
-                      onPress={() => handleRecipeMenuPress(recipe.id)}
-                    >
-                      <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.gray500} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                    <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.gray500} />
+                  </TouchableOpacity>
+                </TouchableOpacity>
               ))}
 
               {filteredRecipes.length === 0 && (
@@ -283,81 +257,99 @@ export default function BoardDetailScreen() {
         </ScrollView>
       </WhiteSheet>
 
-      {/* Backdrop (fuera del WhiteSheet y por encima del header) */}
-      {(showBoardMenu || showRecipeMenu) && (
-        <TouchableOpacity
-          style={styles.menuBackdrop}
-          activeOpacity={1}
-          onPress={() => {
-            setShowBoardMenu(false);
-            setShowRecipeMenu(null);
-          }}
-        />
-      )}
 
-      {/* Menú del tablero (anclado al header) */}
-      {showBoardMenu && menuCoords && (
-        <View style={[styles.menuBase, styles.boardMenu, { top: menuCoords.top, right: menuCoords.right }]}>
-          <TouchableOpacity style={styles.menuOption} onPress={() => handleBoardMenuOption('Compartir')}>
-            <Ionicons name="share" size={20} color={COLORS.gray500} />
-            <Text style={styles.menuOptionText}>Compartir</Text>
-          </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuOption} onPress={() => handleBoardMenuOption('Editar tablero')}>
-            <Ionicons name="pencil" size={20} color={COLORS.gray500} />
-            <Text style={styles.menuOptionText}>Editar tablero</Text>
-          </TouchableOpacity>
+      {/* Menú del tablero (desde abajo) */}
+      {showBoardMenu && (
+        <View style={styles.contextMenuOverlay}>
+          <TouchableOpacity 
+            style={styles.contextMenuBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setShowBoardMenu(false)}
+          />
+          <View style={styles.contextMenu}>
+            <TouchableOpacity 
+              style={styles.contextMenuItem}
+              onPress={() => handleBoardMenuOption('Compartir')}
+            >
+              <Ionicons name="share-outline" size={24} color={COLORS.black} />
+              <Text style={styles.contextMenuText}>Compartir</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuOption} onPress={() => handleBoardMenuOption('Hacer privado')}>
-            <Ionicons name="lock-closed" size={20} color={COLORS.gray500} />
-            <Text style={styles.menuOptionText}>Hacer privado</Text>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.contextMenuItem}
+              onPress={() => handleBoardMenuOption('Editar tablero')}
+            >
+              <Ionicons name="pencil-outline" size={24} color={COLORS.black} />
+              <Text style={styles.contextMenuText}>Editar tablero</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuOption} onPress={() => handleBoardMenuOption('Eliminar tablero')}>
-            <Ionicons name="trash" size={20} color="#ef4444" />
-            <Text style={[styles.menuOptionText, { color: '#ef4444' }]}>Eliminar tablero</Text>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.contextMenuItem}
+              onPress={() => handleBoardMenuOption('Hacer privado')}
+            >
+              <Ionicons name="lock-closed-outline" size={24} color={COLORS.black} />
+              <Text style={styles.contextMenuText}>Hacer privado</Text>
+            </TouchableOpacity>
+
+            {id !== 'mis-recetas' && (
+              <TouchableOpacity 
+                style={styles.contextMenuItem}
+                onPress={() => handleBoardMenuOption('Eliminar tablero')}
+              >
+                <Ionicons name="trash-outline" size={24} color="#ef4444" />
+                <Text style={[styles.contextMenuText, { color: '#ef4444' }]}>Eliminar tablero</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
-      {/* Menú de receta (anclado a cada tarjeta) */}
-      {showRecipeMenu && menuCoords && (
-        <View style={[styles.menuBase, styles.recipeMenu, { top: menuCoords.top, right: menuCoords.right }]}>
-          <TouchableOpacity
-            style={styles.menuOption}
-            onPress={() => handleRecipeMenuOption('Compartir', showRecipeMenu)}
-          >
-            <Ionicons name="share" size={20} color={COLORS.gray500} />
-            <Text style={styles.menuOptionText}>Compartir</Text>
-          </TouchableOpacity>
+      {/* Menú de receta (desde abajo) */}
+      {showRecipeMenu && (
+        <View style={styles.contextMenuOverlay}>
+          <TouchableOpacity 
+            style={styles.contextMenuBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setShowRecipeMenu(null)}
+          />
+          <View style={styles.contextMenu}>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() => handleRecipeMenuOption('Compartir', showRecipeMenu)}
+            >
+              <Ionicons name="share-outline" size={24} color={COLORS.black} />
+              <Text style={styles.contextMenuText}>Compartir</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuOption}
-            onPress={() => handleRecipeMenuOption('Agregar a Tu biblioteca', showRecipeMenu)}
-          >
-            <Ionicons name="add" size={20} color={COLORS.gray500} />
-            <Text style={styles.menuOptionText}>Agregar a Tu biblioteca</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() => handleRecipeMenuOption('Agregar a Tu biblioteca', showRecipeMenu)}
+            >
+              <Ionicons name="bookmark-outline" size={24} color={COLORS.black} />
+              <Text style={styles.contextMenuText}>Agregar a Tu biblioteca</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuOption}
-            onPress={() => handleRecipeMenuOption('Agregar a Plan', showRecipeMenu)}
-          >
-            <Ionicons name="add" size={20} color={COLORS.gray500} />
-            <Text style={styles.menuOptionText}>Agregar a Plan</Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() => handleRecipeMenuOption('Agregar a Plan', showRecipeMenu)}
+            >
+              <Ionicons name="calendar-outline" size={24} color={COLORS.black} />
+              <Text style={styles.contextMenuText}>Agregar a Plan</Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.menuOption}
-            onPress={() =>
-              handleRecipeMenuOption(id === 'mis-recetas' ? 'Eliminar receta' : 'Eliminar de este tablero', showRecipeMenu)
-            }
-          >
-            <Ionicons name="trash" size={20} color="#ef4444" />
-            <Text style={[styles.menuOptionText, { color: '#ef4444' }]}>
-              {id === 'mis-recetas' ? 'Eliminar receta' : 'Eliminar de este tablero'}
-            </Text>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.contextMenuItem}
+              onPress={() =>
+                handleRecipeMenuOption(id === 'mis-recetas' ? 'Eliminar receta' : 'Eliminar de este tablero', showRecipeMenu)
+              }
+            >
+              <Ionicons name="trash-outline" size={24} color="#ef4444" />
+              <Text style={[styles.contextMenuText, { color: '#ef4444' }]}>
+                {id === 'mis-recetas' ? 'Eliminar receta' : 'Eliminar de este tablero'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
     </SafeAreaView>
@@ -505,5 +497,40 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     fontSize: 16,
     fontWeight: '500',
+  },
+  contextMenuOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 10000,
+  },
+  contextMenuBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  contextMenu: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 20,
+  },
+  contextMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 4,
+  },
+  contextMenuText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.black,
+    marginLeft: 16,
   },
 });
