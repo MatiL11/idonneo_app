@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { COLORS, RADII } from '../../../src/styles/tokens';
+import SavedNutritionScreen from './saved';
 
 const DAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -115,7 +116,7 @@ export default function NutricionScreen() {
             <Ionicons 
               name="bookmark" 
               size={24} 
-              color={topTab === 'search' ? COLORS.green : COLORS.white} 
+              color={topTab === 'saved' ? COLORS.green : COLORS.white} 
             />
           </TouchableOpacity>
         </View>
@@ -197,20 +198,20 @@ export default function NutricionScreen() {
               />
             </View>
           </>
-        ) : (
-          // Search / Saved dentro del mismo panel blanco
-          <View style={styles.panel}>
-            <Text style={styles.sectionTitle}>
-              {topTab === 'search' ? 'Buscar alimentos' : 'Guardados'}
-            </Text>
-            <Text style={styles.comingSoon}>
-              {topTab === 'search' 
-                ? 'Función de búsqueda próximamente...' 
-                : 'Alimentos guardados próximamente...'
-              }
-            </Text>
-          </View>
-        )}
+                 ) : topTab === 'search' ? (
+           // Vista de búsqueda
+           <View style={styles.panel}>
+             <Text style={styles.sectionTitle}>Buscar alimentos</Text>
+             <Text style={styles.comingSoon}>
+               Función de búsqueda próximamente...
+             </Text>
+           </View>
+         ) : (
+           // Vista de guardados - mostrar el componente SavedNutritionScreen
+           <View style={styles.panel}>
+             <SavedNutritionScreen />
+           </View>
+         )}
       </SafeAreaView>
     </View>
   );
@@ -404,10 +405,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   
-  comingSoon: {
-    color: COLORS.gray700,
-    fontSize: 16,
-    textAlign: 'center',
-    marginTop: 40,
-  },
-});
+     comingSoon: {
+     color: COLORS.gray700,
+     fontSize: 16,
+     textAlign: 'center',
+     marginTop: 40,
+   },
+
+   
+ });

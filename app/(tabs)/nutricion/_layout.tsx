@@ -6,6 +6,9 @@ export default function NutricionLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="calendar/index" />
       <Stack.Screen name="calendar/edit" />
+      <Stack.Screen name="saved/index" />
+      <Stack.Screen name="saved/create-recipe" />
+      <Stack.Screen name="saved/create-board" />
     </Stack>
   );
 }
