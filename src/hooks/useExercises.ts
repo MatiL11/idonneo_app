@@ -1,4 +1,3 @@
-// hooks/useExercises.ts
 import { useCallback, useEffect, useState } from "react";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";

@@ -9,6 +9,7 @@ export default function NutricionLayout() {
       <Stack.Screen name="saved/index" />
       <Stack.Screen name="saved/create-recipe" />
       <Stack.Screen name="saved/create-board" />
+      <Stack.Screen name="saved/board/[id]" />
     </Stack>
   );
 }

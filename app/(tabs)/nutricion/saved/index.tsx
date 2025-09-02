@@ -4,13 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { COLORS } from '../../../../src/styles/tokens';
 import { useBoards, Board } from '../../../../src/hooks/useBoards';
+import { useRecipes } from '../../../../src/hooks/useRecipes';
+import { supabase } from '../../../../src/lib/supabase';
 
 // Componente genérico para las categorías estilo Pinterest
-const CategoryCard = ({ 
-  title, 
-  showLeaf = false, 
+const CategoryCard = ({
+  title,
+  showLeaf = false,
   onPress,
-  previewImages = []
+  previewImages = [],
 }: {
   title: string;
   showLeaf?: boolean;
@@ -21,97 +23,58 @@ const CategoryCard = ({
 
   const handleImageLoad = (index: number) => {
     setImageLoadStates(prev => {
-      const newStates = [...prev];
-      newStates[index] = true;
-      return newStates;
+      const next = [...prev];
+      next[index] = true;
+      return next;
     });
   };
 
+  // Siempre 4 celdas (2x2). Si faltan imágenes, se rellenan con null para mostrar placeholder.
+  const cells = Array.from({ length: 4 }, (_, i) => previewImages[i] || null);
+
   return (
     <TouchableOpacity style={styles.categoryCard} onPress={onPress}>
-      <View style={[
-        styles.categoryIconContainer,
-        title === 'Tus me gusta' && styles.heartIconContainer
-      ]}>
+      <View
+        style={[
+          styles.categoryIconContainer,
+          title === 'Tus me gusta' && styles.heartIconContainer,
+        ]}
+      >
         {title === 'Tus me gusta' ? (
-          // Diseño especial para "Tus me gusta" - corazón verde
           <Ionicons name="heart" size={40} color={COLORS.white} />
         ) : (
-          // Grid de 4 imágenes estilo Pinterest para las demás categorías
           <View style={styles.imageGrid}>
-            {previewImages.length > 0 ? (
-              <>
-                {/* Primera imagen - ocupa la mitad superior izquierda */}
-                <View style={[styles.imageItem, styles.imageLarge]}>
-                  <Image 
-                    source={{ uri: previewImages[0] }} 
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                    onLoad={() => handleImageLoad(0)}
-                  />
-                  {!imageLoadStates[0] && (
-                    <View style={styles.imageLoadingContainer}>
-                      <ActivityIndicator size="small" color={COLORS.gray500} />
-                    </View>
-                  )}
-                </View>
-                {/* Segunda imagen - ocupa la mitad superior derecha */}
-                <View style={[styles.imageItem, styles.imageSmall]}>
-                  <Image 
-                    source={{ uri: previewImages[1] }} 
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                    onLoad={() => handleImageLoad(1)}
-                  />
-                  {!imageLoadStates[1] && (
-                    <View style={styles.imageLoadingContainer}>
-                      <ActivityIndicator size="small" color={COLORS.gray500} />
-                    </View>
-                  )}
-                </View>
-                {/* Tercera imagen - ocupa la mitad inferior izquierda */}
-                <View style={[styles.imageItem, styles.imageSmall]}>
-                  <Image 
-                    source={{ uri: previewImages[2] }} 
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                    onLoad={() => handleImageLoad(2)}
-                  />
-                  {!imageLoadStates[2] && (
-                    <View style={styles.imageLoadingContainer}>
-                      <ActivityIndicator size="small" color={COLORS.gray500} />
-                    </View>
-                  )}
-                </View>
-                {/* Cuarta imagen - ocupa la mitad inferior derecha */}
-                <View style={[styles.imageItem, styles.imageSmall]}>
-                  <Image 
-                    source={{ uri: previewImages[3] }} 
-                    style={styles.previewImage}
-                    resizeMode="cover"
-                    onLoad={() => handleImageLoad(3)}
-                  />
-                  {!imageLoadStates[3] && (
-                    <View style={styles.imageLoadingContainer}>
-                      <ActivityIndicator size="small" color={COLORS.gray500} />
-                    </View>
-                  )}
-                </View>
-              </>
-            ) : (
-              // Placeholder cuando no hay imágenes
-              <View style={styles.placeholderContainer}>
-                <Ionicons name="images" size={32} color={COLORS.gray500} />
-                <Text style={styles.placeholderText}>Sin imágenes</Text>
+            {cells.map((uri, index) => (
+              <View key={index} style={styles.imageItem}>
+                {uri ? (
+                  <>
+                    <Image
+                      source={{ uri }}
+                      style={styles.previewImage}
+                      resizeMode="cover"
+                      onLoad={() => handleImageLoad(index)}
+                    />
+                    {!imageLoadStates[index] && (
+                      <View style={styles.imageLoadingContainer}>
+                        <ActivityIndicator size="small" color={COLORS.gray500} />
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <View style={styles.cellPlaceholder}>
+                    <Ionicons name="image" size={16} color={COLORS.gray300} />
+                  </View>
+                )}
               </View>
-            )}
+            ))}
           </View>
         )}
       </View>
-             <View style={styles.categoryLabel}>
-         <Text style={styles.categoryText}>{title}</Text>
-         {showLeaf && <Ionicons name="pin" size={16} color={COLORS.green} />}
-       </View>
+
+      <View style={styles.categoryLabel}>
+        <Text style={styles.categoryText}>{title}</Text>
+        {showLeaf && <Ionicons name="pin" size={16} color={COLORS.green} />}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -119,65 +82,118 @@ const CategoryCard = ({
 export default function SavedNutritionScreen() {
   const router = useRouter();
   const { boards, loading, error, hasInitialized, fetchBoards } = useBoards();
+  const { fetchRecipes } = useRecipes();
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [boardImages, setBoardImages] = useState<Record<string, string[]>>({});
   const previousBoardsCountRef = useRef(0);
+
+  // Carga las 4 imágenes (si existen) de cada tablero (y de "mis-recetas").
+  const loadBoardImages = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const imagesMap: Record<string, string[]> = {};
+
+      // Mis recetas: board_id = null
+      {
+        const { data, error } = await supabase
+          .from('recipes')
+          .select('image_url')
+          .eq('user_id', user.id)
+          .is('board_id', null)
+          .not('image_url', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(4);
+
+        if (!error && data) {
+          imagesMap['mis-recetas'] = data.map(r => (r.image_url as string));
+        } else {
+          imagesMap['mis-recetas'] = [];
+          if (error) console.error('Error al cargar imágenes de Mis recetas:', error);
+        }
+      }
+
+      // Cada board del usuario
+      await Promise.all(
+        boards.map(async (board) => {
+          const { data, error } = await supabase
+            .from('recipes')
+            .select('image_url')
+            .eq('user_id', user.id)
+            .eq('board_id', board.id)
+            .not('image_url', 'is', null)
+            .order('created_at', { ascending: false })
+            .limit(4);
+
+          if (!error && data) {
+            imagesMap[board.id] = data.map(r => (r.image_url as string));
+          } else {
+            imagesMap[board.id] = [];
+            if (error) console.error(`Error al cargar imágenes del tablero ${board.id}:`, error);
+          }
+        })
+      );
+
+      setBoardImages(imagesMap);
+    } catch (e) {
+      console.error('Error general al cargar imágenes de tableros:', e);
+    }
+  };
 
   // Inicializar la referencia cuando se monta el componente
   useEffect(() => {
     previousBoardsCountRef.current = boards.length;
   }, [boards.length]);
 
+  // Cargar imágenes cuando cambien los tableros
+  useEffect(() => {
+    if (hasInitialized) {
+      loadBoardImages();
+    }
+  }, [boards, hasInitialized]);
+
   // Recargar tableros cuando se regrese a esta pantalla
   useFocusEffect(
     React.useCallback(() => {
-      console.log('🔄 useFocusEffect ejecutado en SavedNutritionScreen');
-      const currentBoardsCount = boards.length;
-      
-      fetchBoards().then(() => {
-        // Si hay más tableros que antes, mostrar mensaje de éxito
+      const run = async () => {
+        await fetchBoards();
+
+        // Mensaje de éxito si hay más tableros que antes
         if (boards.length > previousBoardsCountRef.current) {
           setShowSuccessMessage(true);
-          setTimeout(() => setShowSuccessMessage(false), 3000); // Ocultar después de 3 segundos
+          setTimeout(() => setShowSuccessMessage(false), 3000);
         }
-        // Actualizar la referencia
         previousBoardsCountRef.current = boards.length;
-      });
+
+        await loadBoardImages();
+      };
+      run();
     }, [fetchBoards])
   );
 
-  // Datos de ejemplo - en el futuro esto vendrá de una API o base de datos
+  // Categorías con imágenes reales
   const categories = [
-    { 
-      title: 'Tus me gusta', 
+    {
+      title: 'Tus me gusta',
       showLeaf: true,
-      previewImages: [] // Sin imágenes por ahora
+      previewImages: [],
     },
-    { 
-      title: 'Mis recetas', 
+    {
+      title: 'Mis recetas',
       showLeaf: true,
-      previewImages: [] // Sin imágenes por ahora
+      previewImages: boardImages['mis-recetas'] || [],
     },
   ];
 
-  const handleAddPress = () => {
-    setShowAddMenu(true);
-  };
-
+  const handleAddPress = () => setShowAddMenu(true);
   const handleMenuOption = (option: string) => {
-    console.log(`Opción seleccionada: ${option}`);
     setShowAddMenu(false);
-    
-    if (option === 'Nueva receta') {
-      router.push('/nutricion/saved/create-recipe');
-    } else if (option === 'Nuevo tablero') {
-      router.push('/nutricion/saved/create-board');
-    }
+    if (option === 'Nueva receta') router.push('/nutricion/saved/create-recipe');
+    if (option === 'Nuevo tablero') router.push('/nutricion/saved/create-board');
   };
-
-  const closeMenu = () => {
-    setShowAddMenu(false);
-  };
+  const closeMenu = () => setShowAddMenu(false);
 
   return (
     <>
@@ -202,104 +218,85 @@ export default function SavedNutritionScreen() {
         </View>
       )}
 
-      {/* Barra de búsqueda */}
+      {/* Barra de búsqueda (placeholder visual) */}
       <View style={styles.searchBar}>
         <Ionicons name="search" size={20} color={COLORS.gray500} />
         <Text style={styles.searchPlaceholder}>Buscar en tu biblioteca...</Text>
       </View>
 
-                     {/* Categorías de la biblioteca */}
-        <View style={styles.libraryCategories}>
-          {categories.map((category, index) => (
-            <CategoryCard
-              key={index}
-              title={category.title}
-              showLeaf={category.showLeaf}
-              previewImages={category.previewImages}
-              onPress={() => console.log(`Navegar a ${category.title}`)}
-            />
-          ))}
+      {/* Categorías */}
+      <View style={styles.libraryCategories}>
+        {categories.map((category, index) => (
+          <CategoryCard
+            key={index}
+            title={category.title}
+            showLeaf={category.showLeaf}
+            previewImages={category.previewImages}
+            onPress={() => {
+              if (category.title === 'Tus me gusta') {
+                // TODO: navegación a "Tus me gusta"
+              } else if (category.title === 'Mis recetas') {
+                router.push('/nutricion/saved/board/mis-recetas');
+              }
+            }}
+          />
+        ))}
+      </View>
+
+      {/* Tableros creados por el usuario */}
+      {!hasInitialized ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.green} />
+          <Text style={styles.loadingText}>Cargando tableros...</Text>
         </View>
-
-        {/* Tableros creados por el usuario */}
-        {!hasInitialized ? (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={COLORS.green} />
-            <Text style={styles.loadingText}>Cargando tableros...</Text>
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>Error al cargar tableros: {error}</Text>
-          </View>
-        ) : (
-          <>
-            {boards.length > 0 ? (
-              <View style={styles.boardsSection}>
-                <View style={styles.boardsGrid}>
-                  {boards.map((board) => (
-                    <TouchableOpacity
-                      key={board.id}
-                      style={styles.boardCard}
-                      onPress={() => console.log(`Navegar a tablero: ${board.title}`)}
-                    >
-                                             <View style={styles.boardIconContainer}>
-                         <Ionicons name="grid" size={40} color={COLORS.green} />
-                       </View>
-                      <Text style={styles.boardTitle} numberOfLines={2}>
-                        {board.title}
-                      </Text>
-                      <Text style={styles.boardDate}>
-                        {new Date(board.created_at).toLocaleDateString('es-ES', {
-                          day: 'numeric',
-                          month: 'short'
-                        })}
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Error al cargar tableros: {error}</Text>
+        </View>
+      ) : (
+        <>
+          {boards.length > 0 ? (
+            <View style={styles.boardsSection}>
+              <View style={styles.boardsGrid}>
+                {boards.map(board => (
+                  <CategoryCard
+                    key={board.id}
+                    title={board.title}
+                    showLeaf={true}
+                    previewImages={boardImages[board.id] || []}
+                    onPress={() => router.push(`/nutricion/saved/board/${board.id}`)}
+                  />
+                ))}
               </View>
-            ) : (
-              <View style={styles.emptyBoardsContainer}>
-                <Ionicons name="grid-outline" size={48} color={COLORS.gray500} />
-                <Text style={styles.emptyBoardsTitle}>No tienes tableros creados</Text>
-                <Text style={styles.emptyBoardsSubtitle}>
-                  Crea tu primer tablero para organizar tus recetas favoritas
-                </Text>
-              </View>
-            )}
-          </>
-        )}
+            </View>
+          ) : (
+            <View style={styles.emptyBoardsContainer}>
+              <Ionicons name="grid-outline" size={48} color={COLORS.gray500} />
+              <Text style={styles.emptyBoardsTitle}>No tienes tableros creados</Text>
+              <Text style={styles.emptyBoardsSubtitle}>
+                Crea tu primer tablero para organizar tus recetas favoritas
+              </Text>
+            </View>
+          )}
+        </>
+      )}
 
-       {/* Menú contextual para agregar */}
-       {showAddMenu && (
-         <>
-           {/* Backdrop para cerrar el menú */}
-           <TouchableOpacity 
-             style={styles.menuBackdrop} 
-             activeOpacity={1} 
-             onPress={closeMenu}
-           />
-           
-           {/* Menú contextual */}
-           <View style={styles.addMenu}>
-             <TouchableOpacity 
-               style={styles.menuOption}
-               onPress={() => handleMenuOption('Nueva receta')}
-             >
-               <Text style={styles.menuOptionText}>Nueva receta</Text>
-             </TouchableOpacity>
-             
-             <TouchableOpacity 
-               style={[styles.menuOption, styles.menuOptionLast]}
-               onPress={() => handleMenuOption('Nuevo tablero')}
-             >
-               <Text style={styles.menuOptionText}>Nuevo tablero</Text>
-             </TouchableOpacity>
-           </View>
-         </>
-       )}
-     </>
-   );
+      {/* Menú contextual para agregar */}
+      {showAddMenu && (
+        <>
+          <TouchableOpacity style={styles.menuBackdrop} activeOpacity={1} onPress={closeMenu} />
+          <View style={styles.addMenu}>
+            <TouchableOpacity style={styles.menuOption} onPress={() => handleMenuOption('Nueva receta')}>
+              <Text style={styles.menuOptionText}>Nueva receta</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.menuOption, styles.menuOptionLast]} onPress={() => handleMenuOption('Nuevo tablero')}>
+              <Text style={styles.menuOptionText}>Nuevo tablero</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      )}
+    </>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -309,7 +306,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
-    paddingHorizontal: 0, // Removido porque el panel ya tiene paddingHorizontal: 20
+    paddingHorizontal: 0,
   },
   libraryTitle: {
     fontSize: 24,
@@ -358,15 +355,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 20,
-    justifyContent: 'center', // Centrar las categorías horizontalmente
+    justifyContent: 'center',
   },
   categoryCard: {
     alignItems: 'center',
-    width: '42%', // Mantener el ancho para que quepan 2 por fila
-    minWidth: 150, // Ancho mínimo para mantener consistencia
+    width: '42%',
+    minWidth: 150,
   },
   categoryIconContainer: {
-    width: '100%', // Adaptarse al contenedor padre
+    width: '100%',
     height: 150,
     borderRadius: 20,
     backgroundColor: COLORS.white,
@@ -375,40 +372,40 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
-    overflow: 'hidden', // Asegurar que el contenido respete los bordes redondeados
+    overflow: 'hidden',
   },
   heartIconContainer: {
     backgroundColor: COLORS.green,
     borderColor: COLORS.green,
   },
-  // Estilos para el grid de imágenes estilo Pinterest
+  // Grid 2x2
   imageGrid: {
     width: '100%',
     height: '100%',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 1,
     backgroundColor: COLORS.gray100,
-    borderRadius: 20, // Mismo radio que el contenedor padre
-    overflow: 'hidden', // Asegurar que las imágenes respeten los bordes
+    borderRadius: 20,
+    overflow: 'hidden',
   },
   imageItem: {
-    borderRadius: 6,
-    overflow: 'hidden',
+    width: '50%',
+    height: '50%',
+    borderWidth: 0.5,
+    borderColor: COLORS.gray200,
     backgroundColor: COLORS.white,
-  },
-  imageLarge: {
-    width: '50%',
-    height: '50%',
-  },
-  imageSmall: {
-    width: '50%',
-    height: '50%',
   },
   previewImage: {
     width: '100%',
     height: '100%',
     backgroundColor: COLORS.gray200,
+  },
+  cellPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.gray100,
   },
   placeholderContainer: {
     width: '100%',
@@ -416,7 +413,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.gray100,
-    borderRadius: 20, // Mismo radio que el contenedor padre
+    borderRadius: 20,
   },
   placeholderText: {
     color: COLORS.gray500,
@@ -432,7 +429,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.gray100,
-    borderRadius: 20, // Mismo radio que el contenedor padre
   },
   categoryLabel: {
     flexDirection: 'row',
@@ -444,29 +440,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  // Estilos para el menú contextual
+  // Menú contextual
   menuBackdrop: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.3)',
     zIndex: 1000,
   },
   addMenu: {
     position: 'absolute',
-    top: 80, // Ajustado para que aparezca más cerca del botón
+    top: 80,
     right: 20,
     backgroundColor: COLORS.white,
     borderRadius: 12,
     paddingVertical: 8,
     paddingHorizontal: 0,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
@@ -488,7 +478,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-  // Estilos para los tableros
+  // Tableros
   loadingContainer: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -508,23 +498,23 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   boardsSection: {
-    marginTop: 24, // Espaciado más equilibrado con las categorías
-    width: '100%', // Ocupar todo el ancho disponible
+    marginTop: 24,
+    width: '100%',
   },
   boardsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 20, // Mismo espaciado que las categorías
-    justifyContent: 'center', // Centrar los tableros horizontalmente
+    gap: 20,
+    justifyContent: 'center',
   },
   boardCard: {
     alignItems: 'center',
-    width: '42%', // Mismo ancho que las categorías para consistencia
+    width: '42%',
   },
   boardIconContainer: {
-    width: 150, // Mismo tamaño que las categorías
-    height: 150, // Mismo tamaño que las categorías
-    borderRadius: 20, // Mismo radio que las categorías
+    width: 150,
+    height: 150,
+    borderRadius: 20,
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.gray300,
@@ -534,16 +524,16 @@ const styles = StyleSheet.create({
   },
   boardTitle: {
     color: COLORS.black,
-    fontSize: 16, // Tamaño más grande para mejor legibilidad
+    fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
-    marginBottom: 6, // Más espacio entre título y fecha
+    marginBottom: 6,
   },
   boardDate: {
     color: COLORS.gray500,
-    fontSize: 14, // Tamaño más grande para mejor legibilidad
+    fontSize: 14,
   },
-  // Estilos para el estado vacío de tableros
+  // Estado vacío
   emptyBoardsContainer: {
     alignItems: 'center',
     paddingVertical: 40,
@@ -564,7 +554,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 20,
   },
-  // Estilos para el mensaje de éxito
+  // Éxito
   successMessage: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -580,5 +570,4 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-
 });

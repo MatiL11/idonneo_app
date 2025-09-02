@@ -77,5 +77,3 @@ coverage/
 
 # Local Netlify folder
 .netlify
-
-.src/database/

@@ -35,27 +35,37 @@ export default function HeaderBar({
       {rightButton && (
         <TouchableOpacity 
           style={[
-            styles.rightButton, 
+            rightButton.text ? styles.rightButton : styles.iconOnlyButton,
             rightButton.variant === 'primary' && styles.primaryButton
           ]} 
           onPress={rightButton.onPress}
         >
-          <View style={[
-            styles.buttonBadge, 
-            rightButton.variant === 'primary' && styles.primaryBadge
-          ]}>
+          {rightButton.text ? (
+            <>
+              <View style={[
+                styles.buttonBadge, 
+                rightButton.variant === 'primary' && styles.primaryBadge
+              ]}>
+                <Ionicons 
+                  name={rightButton.icon as any} 
+                  size={16} 
+                  color={rightButton.variant === 'primary' ? COLORS.white : '#666'} 
+                />
+              </View>
+              <Text style={[
+                styles.buttonText,
+                rightButton.variant === 'primary' && styles.primaryButtonText
+              ]}>
+                {rightButton.text}
+              </Text>
+            </>
+          ) : (
             <Ionicons 
               name={rightButton.icon as any} 
-              size={16} 
-              color={rightButton.variant === 'primary' ? COLORS.white : '#666'} 
+              size={20} 
+              color={COLORS.white} 
             />
-          </View>
-          <Text style={[
-            styles.buttonText,
-            rightButton.variant === 'primary' && styles.primaryButtonText
-          ]}>
-            {rightButton.text}
-          </Text>
+          )}
         </TouchableOpacity>
       )}
     </View>
@@ -96,6 +106,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 8,
     paddingHorizontal: 12,
+  },
+  iconOnlyButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#242424',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   primaryButton: {
     backgroundColor: COLORS.white,
