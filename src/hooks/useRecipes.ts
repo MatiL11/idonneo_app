@@ -468,7 +468,6 @@ export function useRecipes() {
         throw searchError;
       }
 
-      console.log('✅ Búsqueda de recetas públicas exitosa:', recipes?.length || 0, 'resultados');
       return recipes || [];
 
     } catch (err) {
@@ -509,7 +508,6 @@ export function useRecipes() {
         throw fetchError;
       }
 
-      console.log('✅ Recetas públicas cargadas:', recipes?.length || 0, 'recetas');
       return recipes || [];
 
     } catch (err) {

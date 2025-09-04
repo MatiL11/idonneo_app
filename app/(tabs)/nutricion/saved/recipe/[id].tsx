@@ -31,8 +31,25 @@ export default function RecipeDetailScreen() {
   const loadRecipe = async () => {
     try {
       setLoading(true);
+      
+      // Primero intentar buscar en las recetas del usuario
       const recipes = await fetchRecipes();
-      const foundRecipe = recipes.find(r => r.id === id);
+      let foundRecipe = recipes.find(r => r.id === id);
+      
+      // Si no se encuentra, buscar en recetas públicas (incluyendo las del admin)
+      if (!foundRecipe) {
+        const { data: publicRecipes, error } = await supabase
+          .from('recipes')
+          .select('*')
+          .eq('id', id)
+          .eq('is_public', true)
+          .single();
+        
+        if (!error && publicRecipes) {
+          foundRecipe = publicRecipes as Recipe;
+        }
+      }
+      
       setRecipe(foundRecipe || null);
       if (foundRecipe?.portions) {
         setPortions(foundRecipe.portions);

@@ -16,7 +16,7 @@ interface PublicRecipe {
   protein_per_100g?: number;
   carbs_per_100g?: number;
   fat_per_100g?: number;
-  user_id: string;
+  user_id: string | null; // Puede ser null para recetas del administrador
   created_at: string;
 }
 
@@ -72,8 +72,16 @@ export default function SearchRecipesScreen() {
     router.push('/nutricion/search/filters');
   };
 
+  const handleRecipePress = (recipe: PublicRecipe) => {
+    router.push(`/nutricion/saved/recipe/${recipe.id}`);
+  };
+
   const renderRecipe = ({ item }: { item: PublicRecipe }) => (
-    <TouchableOpacity style={styles.recipeCard} activeOpacity={0.8}>
+    <TouchableOpacity 
+      style={styles.recipeCard} 
+      activeOpacity={0.8}
+      onPress={() => handleRecipePress(item)}
+    >
       {item.image_url ? (
         <Image source={{ uri: item.image_url }} style={styles.recipeImage} />
       ) : (
